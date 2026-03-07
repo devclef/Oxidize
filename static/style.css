@@ -1,0 +1,92 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: #f4f7f6;
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+}
+
+.account-list {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.account-card {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.account-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.account-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.account-type-tag {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #95a5a6;
+    background-color: #f1f2f6;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+.account-balance {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 1.2rem;
+    color: #27ae60;
+}
+
+.negative {
+    color: #e74c3c;
+}
+
+.controls {
+    margin: 2rem 0;
+    text-align: center;
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.controls select {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    margin-left: 0.5rem;
+}
+
+.loading {
+    text-align: center;
+    font-style: italic;
+    color: #7f8c8d;
+}
+
+.error {
+    color: #e74c3c;
+    background: #fdeaea;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+}
