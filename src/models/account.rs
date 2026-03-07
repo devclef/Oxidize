@@ -22,6 +22,7 @@ pub struct AccountAttributes {
 
 #[derive(Serialize)]
 pub struct SimpleAccount {
+    pub id: String,
     pub name: String,
     pub balance: String,
     pub currency: String,

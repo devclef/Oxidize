@@ -26,6 +26,7 @@ async function fetchAccounts() {
             const isNegative = parseFloat(account.balance) < 0;
             html += `
                 <div class="account-card">
+                    <input type="checkbox" class="account-select" value="${account.id}">
                     <div class="account-info">
                         <span class="account-name">${account.name}</span>
                         <span class="account-type-tag">${account.account_type}</span>
@@ -51,18 +52,34 @@ async function fetchChartData() {
     // Clear previous errors
     chartError.innerHTML = '';
     
+    const selectedCheckboxes = document.querySelectorAll('.account-select:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+    
     try {
-        const response = await fetch('/api/accounts/balance-history');
+        let url = '/api/accounts/balance-history';
+        if (selectedIds.length > 0) {
+            const params = new URLSearchParams();
+            selectedIds.forEach(id => params.append('accounts[]', id));
+            url += `?${params.toString()}`;
+        }
+        
+        const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Error: ${response.status} ${response.statusText}`);
         }
         const history = await response.json();
         
         if (!history || history.length === 0) {
-            chartContainer.style.display = 'none';
+            // If we selected specific accounts and got nothing, show error
+            if (selectedIds.length > 0) {
+                 chartError.innerHTML = '<div class="error">No data returned for selected accounts.</div>';
+            } else {
+                 chartContainer.style.display = 'none';
+            }
             return;
         }
 
+        chartContainer.style.display = 'block';
         renderChart(history);
     } catch (error) {
         console.error('Fetch chart error:', error);
@@ -157,8 +174,15 @@ function renderChart(history) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    const filterSelect = document.getElementById('type-filter');
-    filterSelect.addEventListener('change', fetchAccounts);
-    fetchAccounts();
+    const fetchAccountsBtn = document.getElementById('fetch-accounts-btn');
+    const updateChartBtn = document.getElementById('update-chart-btn');
+    const app = document.getElementById('app');
+
+    app.innerHTML = '<div class="loading">Select a type and click "Fetch Accounts" to begin.</div>';
+
+    fetchAccountsBtn.addEventListener('click', fetchAccounts);
+    updateChartBtn.addEventListener('click', fetchChartData);
+    
+    // Initial chart load
     fetchChartData();
 });

@@ -25,7 +25,6 @@ h1 {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
-    justify-content: space-between;
     align-items: center;
 }
 
@@ -33,6 +32,7 @@ h1 {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    flex-grow: 1;
 }
 
 .account-name {
@@ -99,10 +99,38 @@ h1 {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.chart-container h2 {
-    color: #2c3e50;
-    margin-bottom: 1.5rem;
-    text-align: center;
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.chart-header h2 {
+    margin: 0;
+    text-align: left;
+}
+
+#fetch-accounts-btn, #update-chart-btn {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#fetch-accounts-btn:hover, #update-chart-btn:hover {
+    background-color: #2980b9;
+}
+
+.account-card input[type="checkbox"] {
+    margin-right: 1.5rem;
+    width: 1.2rem;
+    height: 1.2rem;
+    cursor: pointer;
 }
 
 .chart-wrapper {

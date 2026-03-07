@@ -59,6 +59,7 @@ impl FireflyClient {
 
         let simple_accounts = account_array.data.into_iter().map(|a| {
             SimpleAccount {
+                id: a.id,
                 name: a.attributes.name,
                 balance: a.attributes.current_balance,
                 currency: a.attributes.currency_symbol,
@@ -69,7 +70,7 @@ impl FireflyClient {
         Ok(simple_accounts)
     }
 
-    pub async fn get_asset_balance_history(&self) -> Result<ChartLine, String> {
+    pub async fn get_balance_history(&self, account_ids: Option<Vec<String>>) -> Result<ChartLine, String> {
         let mut headers = HeaderMap::new();
         if !self.config.firefly_token.is_empty() {
             headers.insert(
@@ -82,16 +83,34 @@ impl FireflyClient {
         let end_date = Utc::now();
         let start_date = end_date - Duration::days(30);
 
-        let url = format!("{}/v1/chart/account/overview", self.config.firefly_url);
+        let is_overview = account_ids.as_ref().map_or(true, |ids| ids.is_empty());
+
+        let url = if is_overview {
+            format!("{}/v1/chart/account/overview", self.config.firefly_url)
+        } else {
+            format!("{}/v1/chart/balance/balance", self.config.firefly_url)
+        };
+
+        let mut query_params = vec![
+            ("start".to_string(), start_date.format("%Y-%m-%d").to_string()),
+            ("end".to_string(), end_date.format("%Y-%m-%d").to_string()),
+            ("period".to_string(), "1D".to_string()),
+        ];
+
+        // Only use preselected if no specific account IDs are provided
+        if is_overview {
+            query_params.push(("preselected".to_string(), "assets".to_string()));
+        }
+
+        if let Some(ids) = account_ids {
+            for id in ids {
+                query_params.push(("accounts[]".to_string(), id));
+            }
+        }
 
         let response = self.client.get(url)
             .headers(headers)
-            .query(&[
-                ("start", start_date.format("%Y-%m-%d").to_string()),
-                ("end", end_date.format("%Y-%m-%d").to_string()),
-                ("preselected", "assets".to_string()),
-                ("period", "1D".to_string()),
-            ])
+            .query(&query_params)
             .send()
             .await
             .map_err(|e| {

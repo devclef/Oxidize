@@ -18,13 +18,17 @@
             <option value="revenue">Revenue</option>
             <option value="liability">Liability</option>
         </select>
+        <button id="fetch-accounts-btn">Fetch Accounts</button>
     </div>
     <div id="app">
         <div class="loading">Loading accounts...</div>
     </div>
 
     <div class="chart-container">
-        <h2>Asset Balance History (Last 30 Days)</h2>
+        <div class="chart-header">
+            <h2>Account Balance History (Last 30 Days)</h2>
+            <button id="update-chart-btn">Update Graph</button>
+        </div>
         <div id="chart-error"></div>
         <div class="chart-wrapper">
             <canvas id="balanceChart"></canvas>

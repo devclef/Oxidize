@@ -1,6 +1,5 @@
-use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{get, web, HttpResponse, Responder, HttpRequest};
 use crate::client::FireflyClient;
-
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -23,8 +22,23 @@ pub async fn get_accounts(
 #[get("/api/accounts/balance-history")]
 pub async fn get_balance_history(
     client: web::Data<FireflyClient>,
+    req: HttpRequest,
 ) -> impl Responder {
-    match client.get_asset_balance_history().await {
+    let query_string = req.query_string();
+    let params: Vec<(String, String)> = serde_urlencoded::from_str(query_string).unwrap_or_default();
+
+    let account_ids: Vec<String> = params.into_iter()
+        .filter(|(k, _)| k == "accounts[]")
+        .map(|(_, v)| v)
+        .collect();
+
+    let ids = if account_ids.is_empty() {
+        None
+    } else {
+        Some(account_ids)
+    };
+
+    match client.get_balance_history(ids).await {
         Ok(history) => HttpResponse::Ok().json(history),
         Err(e) => HttpResponse::InternalServerError().body(e),
     }
