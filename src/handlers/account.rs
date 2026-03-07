@@ -19,3 +19,13 @@ pub async fn get_accounts(
         Err(e) => HttpResponse::InternalServerError().body(e),
     }
 }
+
+#[get("/api/accounts/balance-history")]
+pub async fn get_balance_history(
+    client: web::Data<FireflyClient>,
+) -> impl Responder {
+    match client.get_asset_balance_history().await {
+        Ok(history) => HttpResponse::Ok().json(history),
+        Err(e) => HttpResponse::InternalServerError().body(e),
+    }
+}

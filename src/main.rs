@@ -24,6 +24,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(firefly_client.clone())
             .service(handlers::account::get_accounts)
+            .service(handlers::account::get_balance_history)
             .route("/", web::get().to(handlers::index::index))
             .service(actix_files::Files::new("/static", "./static"))
     })
