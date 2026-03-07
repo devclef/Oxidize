@@ -83,13 +83,7 @@ impl FireflyClient {
         let end_date = Utc::now();
         let start_date = end_date - Duration::days(30);
 
-        let is_overview = account_ids.as_ref().map_or(true, |ids| ids.is_empty());
-
-        let url = if is_overview {
-            format!("{}/v1/chart/account/overview", self.config.firefly_url)
-        } else {
-            format!("{}/v1/chart/balance/balance", self.config.firefly_url)
-        };
+        let url = format!("{}/v1/chart/balance/balance", self.config.firefly_url);
 
         let mut query_params = vec![
             ("start".to_string(), start_date.format("%Y-%m-%d").to_string()),
@@ -97,15 +91,16 @@ impl FireflyClient {
             ("period".to_string(), "1D".to_string()),
         ];
 
-        // Only use preselected if no specific account IDs are provided
-        if is_overview {
-            query_params.push(("preselected".to_string(), "assets".to_string()));
-        }
-
         if let Some(ids) = account_ids {
-            for id in ids {
-                query_params.push(("accounts[]".to_string(), id));
+            if ids.is_empty() {
+                query_params.push(("preselected".to_string(), "assets".to_string()));
+            } else {
+                for id in ids {
+                    query_params.push(("accounts[]".to_string(), id));
+                }
             }
+        } else {
+            query_params.push(("preselected".to_string(), "assets".to_string()));
         }
 
         let response = self.client.get(url)

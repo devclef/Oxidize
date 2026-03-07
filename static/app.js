@@ -99,7 +99,7 @@ function renderChart(history) {
     
     // Extract labels from the first dataset that has entries
     let labels = [];
-    const firstDataset = history.find(ds => ds.entries);
+    const firstDataset = history.find(ds => ds.entries && (Array.isArray(ds.entries) ? ds.entries.length > 0 : Object.keys(ds.entries).length > 0));
     if (firstDataset) {
         if (Array.isArray(firstDataset.entries)) {
             labels = firstDataset.entries.map(e => e.key);
