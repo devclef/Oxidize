@@ -1,0 +1,11 @@
+/target/
+frontend/dist/
+*.db
+.env
+.DS_Store
+firefly-reporting-backend/src/*.rs.bak
+
+
+# Added by cargo
+
+/target
