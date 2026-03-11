@@ -20,8 +20,20 @@
         </select>
         <button id="fetch-accounts-btn">Fetch Accounts</button>
     </div>
-    <div id="app">
-        <div class="loading">Loading accounts...</div>
+    <div class="account-section">
+        <div class="account-section-header">
+            <h3>Accounts</h3>
+            <button id="toggle-accounts-btn" class="toggle-btn" style="display: none;">▼ Collapse</button>
+        </div>
+        <div id="accounts-content">
+            <div class="account-actions">
+                <button id="select-all-btn">Select All</button>
+                <button id="deselect-all-btn">Deselect All</button>
+            </div>
+            <div id="app">
+                <div class="loading">Loading accounts...</div>
+            </div>
+        </div>
     </div>
 
     <div class="saved-lists-container">

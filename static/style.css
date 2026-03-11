@@ -185,6 +185,38 @@ button:hover {
     min-width: 150px;
 }
 
+.account-section {
+    margin: 2rem 0;
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.account-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.account-section-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.toggle-btn {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.9rem;
+}
+
+.account-actions {
+    margin: 1rem 0;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
 .account-card input[type="checkbox"] {
     margin-right: 1.5rem;
     width: 1.2rem;

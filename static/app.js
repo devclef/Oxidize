@@ -53,6 +53,9 @@ async function fetchAccounts() {
         });
         html += '</div>';
         app.innerHTML = html;
+
+        // Show the collapse/expand button after accounts are loaded
+        document.getElementById('toggle-accounts-btn').style.display = 'inline-block';
     } catch (error) {
         app.innerHTML = `<div class="error">Failed to load accounts: ${error.message}</div>`;
         console.error('Fetch error:', error);
@@ -371,6 +374,27 @@ function deleteSavedList() {
     }
 }
 
+function selectAllAccounts() {
+    document.querySelectorAll('.account-select').forEach(cb => cb.checked = true);
+}
+
+function deselectAllAccounts() {
+    document.querySelectorAll('.account-select').forEach(cb => cb.checked = false);
+}
+
+function toggleAccountsSection() {
+    const content = document.getElementById('accounts-content');
+    const btn = document.getElementById('toggle-accounts-btn');
+
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        btn.textContent = '▼ Collapse';
+    } else {
+        content.style.display = 'none';
+        btn.textContent = '▶ Expand';
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     const fetchAccountsBtn = document.getElementById('fetch-accounts-btn');
@@ -378,6 +402,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveListBtn = document.getElementById('save-list-btn');
     const loadListBtn = document.getElementById('load-list-btn');
     const deleteListBtn = document.getElementById('delete-list-btn');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const deselectAllBtn = document.getElementById('deselect-all-btn');
+    const toggleAccountsBtn = document.getElementById('toggle-accounts-btn');
     const app = document.getElementById('app');
 
     // Set default dates (last 30 days)
@@ -395,6 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
     saveListBtn.addEventListener('click', saveCurrentSelection);
     loadListBtn.addEventListener('click', loadSavedList);
     deleteListBtn.addEventListener('click', deleteSavedList);
+    selectAllBtn.addEventListener('click', selectAllAccounts);
+    deselectAllBtn.addEventListener('click', deselectAllAccounts);
+    toggleAccountsBtn.addEventListener('click', toggleAccountsSection);
 
     // Load saved lists dropdown
     updateSavedListsDropdown();
