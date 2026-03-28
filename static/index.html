@@ -65,12 +65,27 @@
                     <option value="1M">Month</option>
                     <option value="1Y">Year</option>
                 </select>
+                <div class="chart-mode-toggle">
+                    <label>View:</label>
+                    <label class="mode-label">
+                        <input type="radio" name="chart-mode" value="combined" checked>
+                        Combined
+                    </label>
+                    <label class="mode-label">
+                        <input type="radio" name="chart-mode" value="split">
+                        Split
+                    </label>
+                </div>
                 <button id="update-chart-btn">Update Graph</button>
             </div>
         </div>
         <div id="chart-error"></div>
         <div class="chart-wrapper">
             <canvas id="balanceChart"></canvas>
+        </div>
+        <div id="chart-legend" class="chart-legend"></div>
+        <div id="split-legend" class="chart-legend" style="display: none;">
+            <div class="legend-container" id="legend-items"></div>
         </div>
     </div>
 
