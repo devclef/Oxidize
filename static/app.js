@@ -171,6 +171,7 @@ function renderChart(history) {
     // Process datasets
     const processedDatasets = [];
     const accountInfo = []; // Store account info for legend
+    const totalFlowData = new Array(labels.length).fill(0);
 
     history.forEach(ds => {
         let flowData = [];
@@ -184,6 +185,13 @@ function renderChart(history) {
                 return parseFloat(v);
             });
         }
+
+        // Sum the data into the aggregated dataset for combined mode
+        flowData.forEach((val, i) => {
+            if (i < totalFlowData.length) {
+                totalFlowData[i] += val;
+            }
+        });
 
         // Find matching account for this dataset to include in anchor balance
         // Normalize label to match account name
@@ -237,17 +245,27 @@ function renderChart(history) {
         }
     }
 
+    // Deduplicate accountInfo (remove duplicates based on id)
+    const uniqueAccountInfo = [];
+    const seenIds = new Set();
+    accountInfo.forEach(info => {
+        if (!seenIds.has(info.id)) {
+            seenIds.add(info.id);
+            uniqueAccountInfo.push(info);
+        }
+    });
+
     // Generate colors for accounts
-    accountColors = generateColors(accountInfo.length);
+    accountColors = generateColors(uniqueAccountInfo.length);
 
     // Initialize visibility tracking
-    accountInfo.forEach((info, index) => {
+    uniqueAccountInfo.forEach((info, index) => {
         datasetVisibility[info.id] = true;
     });
 
     if (chartMode === 'split') {
         // Create individual datasets for each account
-        const chartDatasets = accountInfo.map((info, index) => {
+        const chartDatasets = uniqueAccountInfo.map((info, index) => {
             // Get the flow data for this account by matching the dataset label
             const dataset = history.find(ds => {
                 let baseLabel = ds.label
@@ -276,20 +294,33 @@ function renderChart(history) {
                 };
             }
 
+            // Get flow data for this specific dataset
+            let datasetFlowData = [];
+            if (Array.isArray(dataset.entries)) {
+                datasetFlowData = dataset.entries.map(e => parseFloat(e.value || 0));
+            } else {
+                datasetFlowData = Object.values(dataset.entries).map(v => {
+                    if (typeof v === 'object' && v !== null) {
+                        return parseFloat(v.value || 0);
+                    }
+                    return parseFloat(v);
+                });
+            }
+
             // Determine if the data is absolute balance or flow
-            const lastValue = flowData[flowData.length - 1];
+            const lastValue = datasetFlowData[datasetFlowData.length - 1];
             const isAbsolute = Math.abs(lastValue - parseFloat(info.balance)) < 1.0;
 
             let absoluteData;
             if (isAbsolute) {
-                absoluteData = flowData;
+                absoluteData = datasetFlowData;
             } else {
                 // Calculate absolute running balance backwards from the anchor balance
-                absoluteData = new Array(flowData.length);
+                absoluteData = new Array(datasetFlowData.length);
                 let current = parseFloat(info.balance);
-                for (let i = flowData.length - 1; i >= 0; i--) {
+                for (let i = datasetFlowData.length - 1; i >= 0; i--) {
                     absoluteData[i] = current;
-                    current -= flowData[i];
+                    current -= datasetFlowData[i];
                 }
             }
 
@@ -357,36 +388,13 @@ function renderChart(history) {
         });
 
         // Render the legend after chart is created
-        renderSplitLegend(accountInfo, chartDatasets);
+        renderSplitLegend(uniqueAccountInfo, chartDatasets);
     } else {
         // Combined mode - aggregate all datasets
-        const totalFlowData = new Array(labels.length).fill(0);
+        // Calculate total anchor balance from unique accounts
         let totalAnchorBalance = 0;
-
-        history.forEach(ds => {
-            // Sum the data into the aggregated dataset
-            flowData.forEach((val, i) => {
-                if (i < totalFlowData.length) {
-                    totalFlowData[i] += val;
-                }
-            });
-
-            // Calculate total anchor balance
-            accountInfo.forEach(info => {
-                let baseLabel = ds.label
-                    .replace(/ - In$/, '')
-                    .replace(/ - Out$/, '')
-                    .replace(/ \(In\)$/, '')
-                    .replace(/ \(Out\)$/, '')
-                    .replace(/ Income$/, '')
-                    .replace(/ Expense$/, '')
-                    .replace(/ Earned$/, '')
-                    .replace(/ Spent$/, '');
-
-                if (baseLabel === info.name || ds.label === info.name) {
-                    totalAnchorBalance += parseFloat(info.balance);
-                }
-            });
+        uniqueAccountInfo.forEach(info => {
+            totalAnchorBalance += parseFloat(info.balance);
         });
 
         // Determine if the aggregated data is absolute balance or flow
