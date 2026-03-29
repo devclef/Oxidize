@@ -111,6 +111,10 @@ async function fetchChartData() {
         }
         const history = await response.json();
 
+        console.log('=== CHART DATA FETCHED ===');
+        console.log('Selected account IDs:', selectedIds);
+        console.log('Received history:', history);
+
         if (!history || history.length === 0) {
             // If we selected specific accounts and got nothing, show error
             if (selectedIds.length > 0) {
@@ -129,9 +133,10 @@ async function fetchChartData() {
     }
 }
 
-// Track visibility of each dataset in split mode
+// Track visibility of each dataset in split mode by index
 let datasetVisibility = {};
 let accountColors = [];
+let currentDatasets = [];
 
 function generateColors(count) {
     const colors = [];
@@ -160,18 +165,39 @@ function renderChart(history) {
     const firstDataset = history.find(ds => ds.entries && (Array.isArray(ds.entries) ? ds.entries.length > 0 : Object.keys(ds.entries).length > 0));
     if (firstDataset) {
         if (Array.isArray(firstDataset.entries)) {
-            labels = firstDataset.entries.map(e => e.key);
+            labels = firstDataset.entries.map(e => e.key || e.date || e.timestamp);
         } else {
             labels = Object.keys(firstDataset.entries);
         }
     }
 
-    if (labels.length === 0) return;
+    if (labels.length === 0) {
+        console.warn('No labels found in chart data');
+        return;
+    }
 
     // Process datasets
     const processedDatasets = [];
-    const accountInfo = []; // Store account info for legend
     const totalFlowData = new Array(labels.length).fill(0);
+
+    // For split mode, get account info from selected checkboxes (authoritative source)
+    // For combined mode, build accountInfo from history data
+    let accountInfo = [];
+    const selectedCheckboxes = document.querySelectorAll('.account-select:checked');
+
+    if (chartMode === 'split' && selectedCheckboxes.length > 0) {
+        // In split mode, use selected accounts directly
+        selectedCheckboxes.forEach(cb => {
+            const account = allAccounts.find(a => a.id === cb.value);
+            if (account) {
+                accountInfo.push({
+                    id: account.id,
+                    name: account.name,
+                    balance: account.balance
+                });
+            }
+        });
+    }
 
     history.forEach(ds => {
         let flowData = [];
@@ -218,7 +244,6 @@ function renderChart(history) {
     // If no accounts matched (maybe it's a "Net Worth" or "Assets" pre-selection),
     // and we have selected accounts in the UI, use those.
     if (accountInfo.length === 0) {
-        const selectedCheckboxes = document.querySelectorAll('.account-select:checked');
         if (selectedCheckboxes.length > 0) {
             selectedCheckboxes.forEach(cb => {
                 const account = allAccounts.find(a => a.id === cb.value);
@@ -258,29 +283,45 @@ function renderChart(history) {
     // Generate colors for accounts
     accountColors = generateColors(uniqueAccountInfo.length);
 
-    // Initialize visibility tracking
+    // Initialize visibility tracking by index - all visible by default
     uniqueAccountInfo.forEach((info, index) => {
-        datasetVisibility[info.id] = true;
+        datasetVisibility[index] = true;
     });
 
-    if (chartMode === 'split') {
+   if (chartMode === 'split') {
+        console.log('=== SPLIT MODE DEBUG ===');
+        console.log('Selected accounts:', uniqueAccountInfo.map(a => a.name));
+        console.log('All datasets labels:', history.map(ds => ds.label));
+        console.log('All accounts:', allAccounts.map(a => a.name));
+
+        // Filter out "earned"/"spent" aggregated data
+        const filteredHistory = history.filter(ds => ds.label !== 'earned' && ds.label !== 'spent');
+        console.log('Filtered datasets:', filteredHistory.map(ds => ds.label));
+
+        // In split mode, we need data for each selected account
+        // If we got "earned"/"spent" only, the API didn't return per-account data
+        if (filteredHistory.length === 0) {
+            // No per-account data available - hide chart
+            document.querySelector('.chart-container').style.display = 'none';
+            document.getElementById('split-legend').style.display = 'none';
+            document.getElementById('chart-error').innerHTML = `
+                <div class="error">
+                    <strong>Split mode not available</strong><br>
+                    No per-account balance history available for the selected accounts.
+                    Please use Combined mode.
+                </div>
+            `;
+            return;
+        }
+
         // Create individual datasets for each account
-        const chartDatasets = uniqueAccountInfo.map((info, index) => {
-            // Get the flow data for this account by matching the dataset label
-            const dataset = history.find(ds => {
-                let baseLabel = ds.label
-                    .replace(/ - In$/, '')
-                    .replace(/ - Out$/, '')
-                    .replace(/ \(In\)$/, '')
-                    .replace(/ \(Out\)$/, '')
-                    .replace(/ Income$/, '')
-                    .replace(/ Expense$/, '')
-                    .replace(/ Earned$/, '')
-                    .replace(/ Spent$/, '');
-                return baseLabel === info.name || ds.label === info.name;
-            });
+        // The backend now returns per-account data with account name as the label
+        currentDatasets = uniqueAccountInfo.map((info, index) => {
+            // Find the dataset for this account by matching the account name
+            const dataset = filteredHistory.find(ds => ds.label === info.name);
 
             if (!dataset) {
+                console.warn(`No data found for account: ${info.name}`);
                 // No data for this account, return empty dataset
                 return {
                     label: info.name,
@@ -289,27 +330,33 @@ function renderChart(history) {
                     backgroundColor: accountColors[index].background,
                     borderWidth: 2,
                     tension: 0.1,
-                    fill: false,
-                    hidden: true
+                    fill: false
                 };
             }
 
-            // Get flow data for this specific dataset
+            console.log(`Found dataset for: ${info.name}`);
+
+            // Get flow data from the dataset
             let datasetFlowData = [];
             if (Array.isArray(dataset.entries)) {
-                datasetFlowData = dataset.entries.map(e => parseFloat(e.value || 0));
+                datasetFlowData = dataset.entries.map(e => {
+                    const val = e.value || e.amount || e.balance || 0;
+                    return parseFloat(val);
+                });
             } else {
                 datasetFlowData = Object.values(dataset.entries).map(v => {
                     if (typeof v === 'object' && v !== null) {
-                        return parseFloat(v.value || 0);
+                        return parseFloat(v.value || v.amount || v.balance || 0);
                     }
                     return parseFloat(v);
                 });
             }
+            console.log(`Dataset "${dataset.label}" flowData:`, datasetFlowData);
 
             // Determine if the data is absolute balance or flow
             const lastValue = datasetFlowData[datasetFlowData.length - 1];
             const isAbsolute = Math.abs(lastValue - parseFloat(info.balance)) < 1.0;
+            console.log(`Account ${info.name}: lastValue=${lastValue}, balance=${info.balance}, isAbsolute=${isAbsolute}`);
 
             let absoluteData;
             if (isAbsolute) {
@@ -323,6 +370,7 @@ function renderChart(history) {
                     current -= datasetFlowData[i];
                 }
             }
+            console.log(`Account ${info.name}: absoluteData=`, absoluteData.slice(0, 5), '...');
 
             return {
                 label: info.name,
@@ -331,16 +379,20 @@ function renderChart(history) {
                 backgroundColor: accountColors[index].background,
                 borderWidth: 2,
                 tension: 0.1,
-                fill: false,
-                hidden: false
+                fill: false
             };
+        });
+
+        // Apply visibility settings to datasets
+        currentDatasets.forEach((dataset, index) => {
+            dataset.hidden = !datasetVisibility[index];
         });
 
         balanceChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: chartDatasets
+                datasets: currentDatasets
             },
             options: {
                 responsive: true,
@@ -388,7 +440,7 @@ function renderChart(history) {
         });
 
         // Render the legend after chart is created
-        renderSplitLegend(uniqueAccountInfo, chartDatasets);
+        renderSplitLegend(uniqueAccountInfo, currentDatasets);
     } else {
         // Combined mode - aggregate all datasets
         // Calculate total anchor balance from unique accounts
@@ -483,12 +535,13 @@ function renderSplitLegend(accountInfo, datasets) {
         if (!dataset) return;
 
         const item = document.createElement('div');
-        item.className = `legend-item ${dataset.hidden ? 'hidden' : 'active'}`;
-        item.dataset.accountId = info.id;
+        item.className = `legend-item ${datasetVisibility[index] ? 'active' : 'hidden'}`;
+        item.dataset.accountIndex = index;
 
         const colorDiv = document.createElement('div');
         colorDiv.className = 'legend-color';
-        colorDiv.style.backgroundColor = typeof dataset.borderColor === 'string' ? dataset.borderColor : dataset.borderColor.border;
+        const borderColor = typeof dataset.borderColor === 'string' ? dataset.borderColor : dataset.borderColor.border;
+        colorDiv.style.backgroundColor = borderColor;
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'legend-name';
@@ -504,10 +557,9 @@ function renderSplitLegend(accountInfo, datasets) {
 
         // Click handler to toggle visibility
         item.addEventListener('click', () => {
-            const isVisible = dataset.hidden === false;
-
             // Toggle visibility
-            dataset.hidden = !dataset.hidden;
+            datasetVisibility[index] = !datasetVisibility[index];
+            dataset.hidden = !datasetVisibility[index];
             item.classList.toggle('active');
             item.classList.toggle('hidden');
 

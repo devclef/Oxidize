@@ -92,23 +92,30 @@ impl FireflyClient {
             (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string()
         });
 
+        let period = period.unwrap_or_else(|| "1D".to_string());
+
         let url = format!("{}/v1/chart/balance/balance", self.config.firefly_url);
 
+        // Build query params based on whether specific accounts are provided
         let mut query_params = vec![
             ("start".to_string(), start),
             ("end".to_string(), end),
-            ("period".to_string(), period.unwrap_or_else(|| "1D".to_string())),
+            ("period".to_string(), period),
         ];
 
         if let Some(ids) = account_ids {
-            if ids.is_empty() {
-                query_params.push(("preselected".to_string(), "assets".to_string()));
-            } else {
+            if !ids.is_empty() {
+                // When specific accounts are provided, add them to the query
+                // Firefly III will return balance data for those accounts
                 for id in ids {
                     query_params.push(("accounts[]".to_string(), id));
                 }
+            } else {
+                // No specific accounts - use preselected assets
+                query_params.push(("preselected".to_string(), "assets".to_string()));
             }
         } else {
+            // No accounts provided - use preselected assets
             query_params.push(("preselected".to_string(), "assets".to_string()));
         }
 
@@ -135,6 +142,11 @@ impl FireflyClient {
                 error!("Failed to parse chart JSON: {}", e);
                 e.to_string()
             })?;
+
+        error!("Chart API returned {} datasets", chart_line.len());
+        for ds in &chart_line {
+            error!("  Dataset: {}", ds.label);
+        }
 
         Ok(chart_line)
     }

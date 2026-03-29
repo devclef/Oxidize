@@ -26,6 +26,32 @@ h1 {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
+    gap: 1rem;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.account-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #3498db;
+    border-radius: 4px 0 0 4px;
+}
+
+.account-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.account-card input[type="checkbox"] {
+    margin-right: 0;
+    width: 1.3rem;
+    height: 1.3rem;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .account-info {
@@ -53,7 +79,10 @@ h1 {
 .account-balance {
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 1.2rem;
+    font-weight: 600;
     color: #27ae60;
+    white-space: nowrap;
+    margin-left: auto;
 }
 
 .negative {
@@ -217,15 +246,73 @@ button:hover {
     justify-content: center;
 }
 
-.account-card input[type="checkbox"] {
-    margin-right: 1.5rem;
-    width: 1.2rem;
-    height: 1.2rem;
-    cursor: pointer;
-}
-
 .chart-wrapper {
     position: relative;
     height: 400px;
     width: 100%;
+}
+
+.chart-legend {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.legend-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    transition: all 0.2s;
+}
+
+.legend-item:hover {
+    border-color: #3498db;
+    box-shadow: 0 1px 3px rgba(52, 152, 219, 0.2);
+}
+
+.legend-item.active {
+    opacity: 1;
+}
+
+.legend-item.hidden {
+    opacity: 0.4;
+    text-decoration: line-through;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legend-name {
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.legend-toggle-icon {
+    font-size: 0.7rem;
+    color: #95a5a6;
+    transition: transform 0.2s;
+}
+
+.legend-item.active .legend-toggle-icon {
+    transform: rotate(0deg);
+}
+
+.legend-item.hidden .legend-toggle-icon {
+    transform: rotate(-90deg);
 }
