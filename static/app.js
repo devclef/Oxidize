@@ -249,11 +249,13 @@ function renderChart(history) {
         }
 
         // Sum the data into the aggregated dataset for combined mode
-        flowData.forEach((val, i) => {
-            if (i < totalFlowData.length) {
-                totalFlowData[i] += val;
-            }
-        });
+        if (ds.label !== 'earned' && ds.label !== 'spent') {
+            flowData.forEach((val, i) => {
+                if (i < totalFlowData.length) {
+                    totalFlowData[i] += val;
+                }
+            });
+        }
 
         // Find matching account for this dataset to include in anchor balance
         // Normalize label to match account name

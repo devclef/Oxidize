@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::models::{AccountArray, SimpleAccount, ChartLine};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, ACCEPT};
 use chrono::{Utc, Duration};
-use log::error;
+use log::{error, info};
 
 pub struct FireflyClient {
     client: reqwest::Client,
@@ -94,7 +94,7 @@ impl FireflyClient {
 
         let period = period.unwrap_or_else(|| "1D".to_string());
 
-        let url = format!("{}/v1/chart/balance/balance", self.config.firefly_url);
+        let url = format!("{}/v1/chart/account/overview", self.config.firefly_url);
 
         // Build query params based on whether specific accounts are provided
         let mut query_params = vec![
@@ -130,7 +130,7 @@ impl FireflyClient {
             })?;
 
         let full_url = response.url().to_string();
-        error!("Firefly API request URL: {}", full_url);
+        info!("Firefly API request URL: {}", full_url);
 
         if !response.status().is_success() {
             let status = response.status();
@@ -146,9 +146,9 @@ impl FireflyClient {
                 e.to_string()
             })?;
 
-        error!("Chart API returned {} datasets", chart_line.len());
+        info!("Chart API returned {} datasets", chart_line.len());
         for ds in &chart_line {
-            error!("  Dataset: {}", ds.label);
+            info!("  Dataset: {}", ds.label);
         }
 
         Ok(chart_line)
