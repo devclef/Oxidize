@@ -51,6 +51,17 @@ async function updateWidgetDateRange(widgetId) {
     widgets[widgetIndex].interval = interval;
     widgets[widgetIndex].updatedAt = new Date().toISOString();
 
+    // Update chart options
+    if (widgets[widgetIndex].chartOptions === undefined) {
+        widgets[widgetIndex].chartOptions = {};
+    }
+    widgets[widgetIndex].chartOptions.showPoints = document.getElementById(`${widgetId}-show-points`).checked;
+    widgets[widgetIndex].chartOptions.xAxisLimit = parseInt(document.getElementById(`${widgetId}-x-limit`).value);
+    widgets[widgetIndex].chartOptions.yAxisLimit = parseInt(document.getElementById(`${widgetId}-y-limit`).value);
+    widgets[widgetIndex].chartOptions.fillArea = document.getElementById(`${widgetId}-fill-area`).checked;
+    widgets[widgetIndex].chartOptions.tension = parseFloat(document.getElementById(`${widgetId}-tension`).value);
+    widgets[widgetIndex].chartOptions.beginAtZero = document.getElementById(`${widgetId}-begin-zero`).checked;
+
     localStorage.setItem(DASHBOARD_WIDGETS_KEY, JSON.stringify(widgets));
 
     // Close settings panel
@@ -101,6 +112,19 @@ function generateColors(count) {
         colors.push(`hsl(${hue}, 70%, 50%)`);
     }
     return colors;
+}
+
+function getChartOptions(widget) {
+    // Default chart options
+    const defaults = {
+        showPoints: false,
+        xAxisLimit: 6,
+        yAxisLimit: 4,
+        fillArea: true,
+        tension: 0.1,
+        beginAtZero: false
+    };
+    return { ...defaults, ...widget.chartOptions };
 }
 
 async function renderWidgetChart(widget, containerId, allAccounts) {
@@ -178,6 +202,8 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                 }
             }
 
+            const opts = getChartOptions(widget);
+
             if (widgetCharts[widget.id]) {
                 widgetCharts[widget.id].destroy();
             }
@@ -192,9 +218,9 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                         borderColor: '#3498db',
                         backgroundColor: '#3498db20',
                         borderWidth: 2,
-                        tension: 0.1,
-                        fill: true,
-                        pointRadius: 0
+                        tension: opts.tension,
+                        fill: opts.fillArea,
+                        pointRadius: opts.showPoints ? 4 : 0
                     }]
                 },
                 options: {
@@ -215,16 +241,27 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     },
                     scales: {
                         y: {
-                            beginAtZero: false,
+                            beginAtZero: opts.beginAtZero,
                             ticks: {
-                                maxTicksLimit: 4,
+                                maxTicksLimit: opts.yAxisLimit,
                                 callback: function(value) {
                                     return value.toLocaleString();
                                 }
                             }
                         },
                         x: {
-                            display: false
+                            display: true,
+                            ticks: {
+                                maxTicksLimit: opts.xAxisLimit,
+                                autoSkip: true,
+                                callback: function(value) {
+                                    // value is an index into labels array
+                                    const label = this.getLabelForValue(value);
+                                    // label is ISO date string like "2024-01-15T00:00:00Z"
+                                    const date = new Date(label);
+                                    return date.toLocaleDateString();
+                                }
+                            }
                         }
                     }
                 }
@@ -249,14 +286,17 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     return normalizedDsLabel === info.name || ds.label === info.name;
                 });
 
+                const opts = getChartOptions(widget);
+
                 if (!dataset) {
                     return {
                         label: info.name,
                         data: new Array(labels.length).fill(null),
                         borderColor: colors[index],
                         borderWidth: 2,
-                        tension: 0.1,
-                        pointRadius: 0
+                        tension: opts.tension,
+                        fill: opts.fillArea,
+                        pointRadius: opts.showPoints ? 4 : 0
                     };
                 }
 
@@ -293,14 +333,17 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     data: absoluteData,
                     borderColor: colors[index],
                     borderWidth: 2,
-                    tension: 0.1,
-                    pointRadius: 0
+                    tension: opts.tension,
+                    fill: opts.fillArea,
+                    pointRadius: opts.showPoints ? 4 : 0
                 };
             });
 
             if (widgetCharts[widget.id]) {
                 widgetCharts[widget.id].destroy();
             }
+
+            const opts2 = getChartOptions(widget);
 
             widgetCharts[widget.id] = new Chart(ctx, {
                 type: 'line',
@@ -326,16 +369,27 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     },
                     scales: {
                         y: {
-                            beginAtZero: false,
+                            beginAtZero: opts2.beginAtZero,
                             ticks: {
-                                maxTicksLimit: 4,
+                                maxTicksLimit: opts2.yAxisLimit,
                                 callback: function(value) {
                                     return value.toLocaleString();
                                 }
                             }
                         },
                         x: {
-                            display: false
+                            display: true,
+                            ticks: {
+                                maxTicksLimit: opts2.xAxisLimit,
+                                autoSkip: true,
+                                callback: function(value) {
+                                    // value is an index into labels array
+                                    const label = this.getLabelForValue(value);
+                                    // label is ISO date string like "2024-01-15T00:00:00Z"
+                                    const date = new Date(label);
+                                    return date.toLocaleDateString();
+                                }
+                            }
                         }
                     }
                 }
@@ -384,6 +438,9 @@ async function renderDashboard() {
         const endDate = widget.endDate || '';
         const interval = widget.interval || 'auto';
 
+        // Get chart options with defaults
+        const chartOpts = getChartOptions(widget);
+
         html += `
             <div class="widget" data-widget-id="${widget.id}">
                 <div class="widget-header">
@@ -394,17 +451,29 @@ async function renderDashboard() {
                     </div>
                 </div>
                 <div class="widget-settings" id="${widget.id}-settings" style="display: none;">
-                    <label>Start: <input type="date" id="${widget.id}-start" value="${startDate}"></label>
-                    <label>End: <input type="date" id="${widget.id}-end" value="${endDate}"></label>
-                    <label>Interval:
-                        <select id="${widget.id}-interval">
-                            <option value="auto" ${interval === 'auto' ? 'selected' : ''}>Auto</option>
-                            <option value="1D" ${interval === '1D' ? 'selected' : ''}>Day</option>
-                            <option value="1W" ${interval === '1W' ? 'selected' : ''}>Week</option>
-                            <option value="1M" ${interval === '1M' ? 'selected' : ''}>Month</option>
-                            <option value="1Y" ${interval === '1Y' ? 'selected' : ''}>Year</option>
-                        </select>
-                    </label>
+                    <div class="widget-settings-section">
+                        <strong>Date Range</strong>
+                        <label>Start: <input type="date" id="${widget.id}-start" value="${startDate}"></label>
+                        <label>End: <input type="date" id="${widget.id}-end" value="${endDate}"></label>
+                        <label>Interval:
+                            <select id="${widget.id}-interval">
+                                <option value="auto" ${interval === 'auto' ? 'selected' : ''}>Auto</option>
+                                <option value="1D" ${interval === '1D' ? 'selected' : ''}>Day</option>
+                                <option value="1W" ${interval === '1W' ? 'selected' : ''}>Week</option>
+                                <option value="1M" ${interval === '1M' ? 'selected' : ''}>Month</option>
+                                <option value="1Y" ${interval === '1Y' ? 'selected' : ''}>Year</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="widget-settings-section">
+                        <strong>Chart Options</strong>
+                        <label class="checkbox-label"><input type="checkbox" id="${widget.id}-show-points" ${chartOpts.showPoints ? 'checked' : ''}> Show Points</label>
+                        <label class="checkbox-label"><input type="checkbox" id="${widget.id}-fill-area" ${chartOpts.fillArea ? 'checked' : ''}> Fill Area</label>
+                        <label class="checkbox-label"><input type="checkbox" id="${widget.id}-begin-zero" ${chartOpts.beginAtZero ? 'checked' : ''}> Y-Axis from Zero</label>
+                        <label>X-Axis Ticks: <input type="number" id="${widget.id}-x-limit" value="${chartOpts.xAxisLimit}" min="1" max="20" style="width: 60px;"></label>
+                        <label>Y-Axis Ticks: <input type="number" id="${widget.id}-y-limit" value="${chartOpts.yAxisLimit}" min="1" max="10" style="width: 60px;"></label>
+                        <label>Line Smoothness: <input type="range" id="${widget.id}-tension" value="${chartOpts.tension}" min="0" max="1" step="0.1" style="width: 100px;"></label>
+                    </div>
                     <button onclick="updateWidgetDateRange('${widget.id}')">Update</button>
                 </div>
                 <div class="widget-body">
