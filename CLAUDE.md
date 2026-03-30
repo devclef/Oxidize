@@ -48,7 +48,7 @@ docker run -p 8080:8080 --env-file .env oxidize
 - Registers routes for accounts, balance history, and static files
 
 **Configuration**: `src/config.rs`
-- `Config` struct holds `firefly_url`, `firefly_token`, `host`, and `port`
+- `Config` struct holds `firefly_url`, `firefly_token`, `host`, `port`, `account_types`, and `auto_fetch_accounts`
 - Loads from environment variables via dotenv
 
 **Client Layer**: `src/client/mod.rs`
@@ -89,6 +89,10 @@ Required in `.env`:
 - `HOST` - Server bind address (default: 0.0.0.0)
 - `PORT` - Server port (default: 8080)
 - `RUST_LOG` - Logging level (default: info)
+
+Optional:
+- `ACCOUNT_TYPES` - Comma-separated list of account types to show in the filter dropdown (default: asset,cash,expense,revenue,liability)
+- `AUTO_FETCH_ACCOUNTS` - If true, automatically fetch accounts and render chart on page load (default: false)
 
 ## API Endpoints
 

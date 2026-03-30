@@ -17,12 +17,15 @@ async fn main() -> std::io::Result<()> {
     let port = config.port;
 
     info!("Starting server at http://{}:{}", host, port);
+    info!("Account types: {:?}", config.account_types);
+    info!("Auto-fetch accounts: {}", config.auto_fetch_accounts);
 
-    let firefly_client = web::Data::new(FireflyClient::new(config));
+    let firefly_client = web::Data::new(FireflyClient::new(config.clone()));
 
     HttpServer::new(move || {
         App::new()
             .app_data(firefly_client.clone())
+            .app_data(web::Data::new(config.clone()))
             .service(handlers::account::get_accounts)
             .service(handlers::account::get_balance_history)
             .route("/", web::get().to(handlers::index::index))

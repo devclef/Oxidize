@@ -2,6 +2,12 @@ let allAccounts = [];
 let balanceChart = null;
 const SAVED_LISTS_KEY = 'firefly_saved_account_lists';
 
+// Get config from server or use defaults
+const CONFIG = window.OXIDIZE_CONFIG || {
+    accountTypes: ['asset', 'cash', 'expense', 'revenue', 'liability'],
+    autoFetchAccounts: false
+};
+
 async function fetchAccounts() {
     const app = document.getElementById('app');
     const typeFilter = document.getElementById('type-filter');
@@ -10,13 +16,17 @@ async function fetchAccounts() {
     app.innerHTML = '<div class="loading">Loading accounts...</div>';
 
     try {
-        // If 'all' is selected or nothing is selected, fetch all accounts
+        // If 'all' is selected or nothing is selected, fetch all configured account types
         if (selectedTypes.length === 0 || selectedTypes.includes('all')) {
-            const response = await fetch('/api/accounts');
-            if (!response.ok) {
-                throw new Error(`Error: ${response.status} ${response.statusText}`);
+            allAccounts = [];
+            for (const type of CONFIG.accountTypes) {
+                const response = await fetch(`/api/accounts?type=${type}`);
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
+                const accounts = await response.json();
+                allAccounts = allAccounts.concat(accounts);
             }
-            allAccounts = await response.json();
         } else {
             // Fetch accounts for each selected type and combine results
             allAccounts = [];
@@ -834,6 +844,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const deselectAllBtn = document.getElementById('deselect-all-btn');
     const toggleAccountsBtn = document.getElementById('toggle-accounts-btn');
     const app = document.getElementById('app');
+    const typeFilter = document.getElementById('type-filter');
+
+    // Populate type filter with configured account types
+    typeFilter.innerHTML = '<option value="all" selected>All</option>';
+    CONFIG.accountTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+        typeFilter.appendChild(option);
+    });
 
     // Set default dates (last 30 days)
     const endDate = new Date();
@@ -872,8 +892,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load saved lists dropdown
     updateSavedListsDropdown();
 
-    // Initial chart load
-    fetchAccounts().then(() => {
-        fetchChartData();
-    });
+    // Auto-fetch accounts if configured
+    if (CONFIG.autoFetchAccounts) {
+        console.log('Auto-fetch enabled, fetching accounts...');
+        fetchAccounts().then(() => {
+            fetchChartData();
+        });
+    }
 });

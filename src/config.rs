@@ -7,6 +7,8 @@ pub struct Config {
     pub firefly_token: String,
     pub host: String,
     pub port: u16,
+    pub account_types: Vec<String>,
+    pub auto_fetch_accounts: bool,
 }
 
 impl Config {
@@ -24,11 +26,27 @@ impl Config {
             .parse::<u16>()
             .unwrap_or(8080);
 
+        // Parse ACCOUNT_TYPES: comma-separated list of account types to show in the filter
+        // Default to common Firefly III account types
+        let account_types = env::var("ACCOUNT_TYPES")
+            .unwrap_or_else(|_| "asset,cash,expense,revenue,liability".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        // Parse AUTO_FETCH_ACCOUNTS: if true, automatically fetch accounts on page load
+        let auto_fetch_accounts = env::var("AUTO_FETCH_ACCOUNTS")
+            .map(|v| v.trim().to_lowercase() == "true" || v.trim() == "1")
+            .unwrap_or(false);
+
         Self {
             firefly_url,
             firefly_token,
             host,
             port,
+            account_types,
+            auto_fetch_accounts,
         }
     }
 }
