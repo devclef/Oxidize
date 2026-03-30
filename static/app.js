@@ -453,16 +453,36 @@ function renderChart(history) {
                 console.log(`Dataset "${dataset.label}" flowData:`, datasetFlowData);
 
                 // Determine if the data is absolute balance or flow.
-                // For account-based datasets in Firefly III, they are almost always absolute balances.
-                // We use a generous threshold (50% of the value) to account for transactions that
-                // occurred since the last chart data point was calculated or for period mismatches.
+                // Firefly III's chart/account/overview endpoint returns balance snapshots (absolute),
+                // except for "earned" and "spent" which are flow data.
                 const lastValue = datasetFlowData[datasetFlowData.length - 1];
                 const anchorBalance = parseFloat(info.balance);
-                
-                // If the dataset label is "earned" or "spent", it's always flow.
-                // Otherwise, for account-named datasets, we check if it's "close enough" to the anchor balance.
+
+                // "earned" and "spent" are always flow data
                 const isFlowLabel = info.name === 'earned' || info.name === 'spent';
-                const isAbsolute = !isFlowLabel && (Math.abs(lastValue - anchorBalance) < (Math.abs(lastValue) * 0.5 + 50.0));
+
+                let isAbsolute;
+                if (isFlowLabel) {
+                    isAbsolute = false;
+                } else {
+                    // For account datasets, assume absolute balance unless clear evidence otherwise.
+                    // Check if data looks like flow: all values are small and same-sign (typical for transactions)
+                    const allPositive = datasetFlowData.every(v => v >= 0);
+                    const allNegative = datasetFlowData.every(v => v <= 0);
+                    const maxAbsValue = Math.max(...datasetFlowData.map(Math.abs));
+
+                    // If all values are same-sign and relatively small, might be flow data
+                    // But only if the last value is also very different from anchor
+                    const relativeDiff = anchorBalance !== 0 ? Math.abs(lastValue - anchorBalance) / Math.abs(anchorBalance) : Infinity;
+
+                    // Heuristic: treat as flow only if:
+                    // 1. All values are same sign (typical for earned/spent type flows)
+                    // 2. Values are small relative to anchor (transactions vs balances)
+                    // 3. Last value is significantly different from anchor
+                    const looksLikeFlow = (allPositive || allNegative) && maxAbsValue < Math.abs(anchorBalance) * 0.1 && relativeDiff > 0.5;
+
+                    isAbsolute = !looksLikeFlow;
+                }
 
                 console.log(`Account ${info.name}: lastValue=${lastValue}, anchorBalance=${anchorBalance}, isAbsolute=${isAbsolute}`);
 
@@ -472,10 +492,10 @@ function renderChart(history) {
                 } else {
                     // Calculate absolute running balance backwards from the anchor balance
                     absoluteData = new Array(datasetFlowData.length);
-                    let current = parseFloat(info.balance);
+                    let runningBalance = anchorBalance;
                     for (let i = datasetFlowData.length - 1; i >= 0; i--) {
-                        absoluteData[i] = current;
-                        current -= datasetFlowData[i];
+                        absoluteData[i] = runningBalance;
+                        runningBalance -= datasetFlowData[i];
                     }
                 }
                 console.log(`Account ${info.name}: absoluteData=`, absoluteData.slice(0, 5), '...');
@@ -559,12 +579,27 @@ function renderChart(history) {
         });
 
         // Determine if the aggregated data is absolute balance or flow.
-        // Similar to the split mode, we use a generous threshold for detection.
+        // Firefly III's chart endpoint returns balance snapshots (absolute) for accounts.
         const lastTotalValue = totalFlowData[totalFlowData.length - 1];
-        
-        // Combined view usually sums account balances, so it should be absolute.
-        // We only treat it as flow if the values are very small compared to the anchor balance.
-        const isAbsolute = Math.abs(lastTotalValue - totalAnchorBalance) < (Math.abs(lastTotalValue) * 0.5 + 50.0);
+
+        let isAbsolute;
+        if (totalAnchorBalance === 0 && lastTotalValue === 0) {
+            isAbsolute = true;
+        } else if (totalAnchorBalance === 0) {
+            // If anchor is zero but data isn't, check if data looks like flow
+            const allSameSign = totalFlowData.every(v => v >= 0) || totalFlowData.every(v => v <= 0);
+            isAbsolute = !allSameSign;
+        } else {
+            // Check if data looks like flow vs balance
+            const allPositive = totalFlowData.every(v => v >= 0);
+            const allNegative = totalFlowData.every(v => v <= 0);
+            const maxAbsValue = Math.max(...totalFlowData.map(Math.abs));
+            const relativeDiff = Math.abs(lastTotalValue - totalAnchorBalance) / Math.abs(totalAnchorBalance);
+
+            // Heuristic: treat as flow only if all values same-sign, small relative to anchor, and last differs significantly
+            const looksLikeFlow = (allPositive || allNegative) && maxAbsValue < Math.abs(totalAnchorBalance) * 0.1 && relativeDiff > 0.5;
+            isAbsolute = !looksLikeFlow;
+        }
 
         console.log(`Combined Mode: lastTotalValue=${lastTotalValue}, totalAnchorBalance=${totalAnchorBalance}, isAbsolute=${isAbsolute}`);
 
@@ -574,10 +609,10 @@ function renderChart(history) {
         } else {
             // Calculate absolute running balance backwards from the anchor balance
             absoluteData = new Array(totalFlowData.length);
-            let current = totalAnchorBalance;
+            let runningBalance = totalAnchorBalance;
             for (let i = totalFlowData.length - 1; i >= 0; i--) {
-                absoluteData[i] = current;
-                current -= totalFlowData[i];
+                absoluteData[i] = runningBalance;
+                runningBalance -= totalFlowData[i];
             }
         }
 
