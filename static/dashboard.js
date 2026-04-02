@@ -229,8 +229,8 @@ async function renderEarnedSpentChart(ctx, widget, labels, history, containerId)
     const earnedDataset = history.find(ds => ds.label === 'earned');
     const spentDataset = history.find(ds => ds.label === 'spent');
 
-    const earnedData = earnedDataset ? extractChartData(earnedDataset.entries, labels.length) : new Array(labels.length).fill(null);
-    const spentData = spentDataset ? extractChartData(spentDataset.entries, labels.length) : new Array(labels.length).fill(null);
+    const earnedData = earnedDataset ? extractChartData(earnedDataset.entries, labels.length) : new Array(labels.length).fill(0);
+    const spentData = spentDataset ? extractChartData(spentDataset.entries, labels.length) : new Array(labels.length).fill(0);
 
     // Earned is typically positive (income), spent is typically negative (expense)
     // We'll show earned in green and spent in red
@@ -242,35 +242,55 @@ async function renderEarnedSpentChart(ctx, widget, labels, history, containerId)
     }
 
     widgetCharts[widget.id] = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [
                 {
                     label: 'Earned',
                     data: earnedData,
+                    backgroundColor: earnedColor,
                     borderColor: earnedColor,
-                    backgroundColor: earnedColor + '20',
-                    borderWidth: 2,
-                    tension: opts.tension,
-                    fill: opts.fillArea,
-                    pointRadius: opts.showPoints ? 4 : 0
+                    borderWidth: 1
                 },
                 {
                     label: 'Spent',
                     data: spentData,
+                    backgroundColor: spentColor,
                     borderColor: spentColor,
-                    backgroundColor: spentColor + '20',
-                    borderWidth: 2,
-                    tension: opts.tension,
-                    fill: opts.fillArea,
-                    pointRadius: opts.showPoints ? 4 : 0
+                    borderWidth: 1
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: chartGridColor },
+                    ticks: {
+                        color: chartTextColor,
+                        maxTicksLimit: opts.yAxisLimit,
+                        callback: function(value) {
+                            return Math.abs(value).toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    grid: { color: chartGridColor },
+                    ticks: {
+                        color: chartTextColor,
+                        maxTicksLimit: opts.xAxisLimit,
+                        autoSkip: true,
+                        callback: function(value) {
+                            const label = this.getLabelForValue(value);
+                            const date = new Date(label);
+                            return date.toLocaleDateString();
+                        }
+                    }
+                }
+            },
             plugins: {
                 legend: {
                     display: true,
@@ -284,33 +304,6 @@ async function renderEarnedSpentChart(ctx, widget, labels, history, containerId)
                                 return context.dataset.label + ': ' + Math.abs(context.parsed.y).toLocaleString();
                             }
                             return '';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: opts.beginAtZero,
-                    grid: { color: chartGridColor },
-                    ticks: {
-                        color: chartTextColor,
-                        maxTicksLimit: opts.yAxisLimit,
-                        callback: function(value) {
-                            return Math.abs(value).toLocaleString();
-                        }
-                    }
-                },
-                x: {
-                    display: true,
-                    grid: { color: chartGridColor },
-                    ticks: {
-                        color: chartTextColor,
-                        maxTicksLimit: opts.xAxisLimit,
-                        autoSkip: true,
-                        callback: function(value) {
-                            const label = this.getLabelForValue(value);
-                            const date = new Date(label);
-                            return date.toLocaleDateString();
                         }
                     }
                 }
