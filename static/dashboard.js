@@ -334,14 +334,13 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
 
         let history;
         if (widgetType === 'earned_spent') {
-            // For earned vs spent, fetch chart data without specific accounts
-            // Firefly III returns earned/spent data by default
+            // For earned vs spent, use the dedicated earned-spent endpoint
             const params = new URLSearchParams();
             if (widget.start_date) params.append('start', widget.start_date);
             if (widget.end_date) params.append('end', widget.end_date);
             if (widget.interval && widget.interval !== 'auto') params.append('period', widget.interval);
 
-            const url = `/api/accounts/balance-history?${params.toString()}`;
+            const url = `/api/earned-spent?${params.toString()}`;
             const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`Error: ${response.status} ${response.statusText}`);

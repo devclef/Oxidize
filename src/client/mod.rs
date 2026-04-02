@@ -223,4 +223,71 @@ impl FireflyClient {
 
         Ok(chart_line)
     }
+
+    pub async fn get_earned_spent(
+        &self,
+        start_date: Option<String>,
+        end_date: Option<String>,
+        period: Option<String>,
+    ) -> Result<ChartLine, String> {
+        // Firefly III's expense/revenue chart endpoint returns earned (revenue) and spent (expense) data
+        let mut headers = HeaderMap::new();
+        if !self.config.firefly_token.is_empty() {
+            headers.insert(
+                AUTHORIZATION,
+                HeaderValue::from_str(&format!("Bearer {}", self.config.firefly_token)).unwrap()
+            );
+        }
+        headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.api+json"));
+
+        // Use provided dates or default to last 30 days
+        let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+        let start = start_date.unwrap_or_else(|| {
+            (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string()
+        });
+
+        let period = period.unwrap_or_else(|| "1D".to_string());
+
+        let url = format!("{}/v1/chart/expense/revenue", self.config.firefly_url);
+
+        let query_params = vec![
+            ("start".to_string(), start),
+            ("end".to_string(), end),
+            ("period".to_string(), period),
+        ];
+
+        let response = self.client.get(&url)
+            .headers(headers)
+            .query(&query_params)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to send request: {}", e);
+                e.to_string()
+            })?;
+
+        let full_url = response.url().to_string();
+        info!("Firefly API request URL: {}", full_url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            error!("API request failed with status: {}. Body: {}", status, body);
+            return Err(format!("API request failed with status: {}", status));
+        }
+
+        let chart_line: ChartLine = response.json()
+            .await
+            .map_err(|e| {
+                error!("Failed to parse JSON: {}", e);
+                e.to_string()
+            })?;
+
+        info!("Earned/Spent API returned {} datasets", chart_line.len());
+        for ds in &chart_line {
+            info!("  Dataset: {}", ds.label);
+        }
+
+        Ok(chart_line)
+    }
 }
