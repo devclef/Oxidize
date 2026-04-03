@@ -1,0 +1,13 @@
+{
+  "name": "oxidize-frontend",
+  "version": "0.1.0",
+  "description": "Frontend for Oxidize",
+  "type": "module",
+  "scripts": {
+    "test": "vite test"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "jsdom": "^22.0.0"
+  }
+}

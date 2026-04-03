@@ -24,9 +24,15 @@ cargo build
 
 # Build for release
 cargo build --release
+```
 
-# Run tests
+### Run tests
+```bash
+# Run backend tests
 cargo test
+
+# Run frontend tests
+npm test
 ```
 
 ### Docker
@@ -58,7 +64,7 @@ docker run -p 8080:8080 --env-file .env oxidize
 
 **API Handlers**: `src/handlers/`
 - `account.rs` - `/api/accounts` and `/api/accounts/balance-history` endpoints
-- `index.rs` - Serves the main HTML page
+- `index.rs` - Serve the main HTML page
 
 **Data Models**: `src/models/`
 - `account.rs` - `AccountArray`, `AccountRead`, `AccountAttributes`, `SimpleAccount`
@@ -74,7 +80,7 @@ docker run -p 8080:8080 --env-file .env oxidize
   - `renderChart()` - Uses Chart.js to render balance history
   - Saved account lists stored in localStorage
 
-### Key Design Patterns
+## Key Design Patterns
 
 1. **API Proxy Pattern**: Backend proxies requests to Firefly III, avoiding CORS issues
 2. **Data Aggregation**: Chart data from multiple datasets is aggregated into a single line
@@ -102,12 +108,34 @@ Optional:
 
 ## Dependencies
 
+### Backend
 - **actix-web** - HTTP server
 - **actix-files** - Static file serving
-- **reqwest** - HTTP client for Firefly III API
+- **reqwest** - HTTP client for Firefly III
 - **serde/serde_json** - JSON serialization
 - **chrono** - Date handling
+- **dotenv** - Environment variable loading
+- **env_logger** - Logging
+- **serde_urlencoded** - URL parameter parsing
+- **rusqlite** - SQLite database interaction
+- **dirs** - Directory path utilities
+- **once_cell** - Lazy initialization
+
+### Frontend
 - **Chart.js** - Frontend charting (via CDN)
+- **Vitest** - Frontend test runner
+
+## Testing
+
+### Backend Testing
+- **Framework**: `cargo test`
+- **Mocking**: `mockito` is used to mock external Firefly III API calls.
+- **Integration Tests**: Located in `tests/`.
+
+### Frontend Testing
+- **Framework**: `Vitest` with `jsdom`.
+- **Command**: `npm test`
+- **Location**: Tests are located in `static/app.test.js`.
 
 ## Editing Guidelines
 
@@ -118,3 +146,10 @@ When updating `static/style.css`, use CSS variables for theming features. After 
 - Always read the file before editing to ensure you have the latest content
 - If an edit fails with a parameter error, re-read the file and retry with the exact current content
 - For multi-step edits, consider using `replace_all` for repetitive pattern changes
+
+### Testing Mandate
+- **Always** write tests for new logic.
+- **Backend**: Use `cargo test`.
+- **Frontend**: Use `npm test`.
+- Verify that all tests pass before completing a task.
+- Follow Test Driven Development (TDD) where possible.

@@ -317,17 +317,10 @@ impl FireflyClient {
         account_ids: Option<&Vec<String>>,
     ) -> Result<Vec<serde_json::Value>, String> {
         let url = format!("{}/v1/transactions", self.config.firefly_url);
-        let mut query_params = vec![
+        let query_params = vec![
             ("start".to_string(), start.to_string()),
             ("end".to_string(), end.to_string()),
         ];
-
-        // Add account filter if provided
-        if let Some(ids) = account_ids {
-            for id in ids {
-                query_params.push(("accounts[]".to_string(), id.clone()));
-            }
-        }
 
         let mut all_transactions = Vec::new();
         let mut offset = 0;
@@ -367,7 +360,50 @@ impl FireflyClient {
             }
         }
 
+        // If account IDs are provided, filter transactions to only include those
+        // that involve the specified accounts
+        if let Some(ids) = account_ids {
+            if !ids.is_empty() {
+                let id_set: std::collections::HashSet<String> = ids.iter().cloned().collect();
+                let before_count = all_transactions.len();
+                all_transactions.retain(|tx| {
+                    self.transaction_involves_account(tx, &id_set)
+                });
+                let after_count = all_transactions.len();
+                info!("Filtered {} transactions to {} based on account IDs", before_count, after_count);
+            }
+        }
+
         Ok(all_transactions)
+    }
+
+    /// Check if a transaction involves any of the specified account IDs
+    fn transaction_involves_account(
+        &self,
+        tx: &serde_json::Value,
+        account_ids: &std::collections::HashSet<String>,
+    ) -> bool {
+        tx.get("attributes")
+            .and_then(|a| a.get("transactions"))
+            .and_then(|t| t.as_array())
+            .map(|transactions| {
+                transactions.iter().any(|t| {
+                    // Check source account
+                    let source_match = t.get("source_id")
+                        .and_then(|s| s.as_str())
+                        .map(|s| account_ids.contains(s))
+                        .unwrap_or(false);
+
+                    // Check destination account
+                    let dest_match = t.get("destination_id")
+                        .and_then(|d| d.as_str())
+                        .map(|d| account_ids.contains(d))
+                        .unwrap_or(false);
+
+                    source_match || dest_match
+                })
+            })
+            .unwrap_or(false)
     }
 
     /// Aggregate transactions by period
@@ -403,7 +439,7 @@ impl FireflyClient {
             }
         };
 
-        // Process earned transactions (deposits)
+        // Process earned transactions (deposit)
         for tx in &earned_transactions {
             if let Some(transactions) = tx.get("attributes").and_then(|a| a.get("transactions")).and_then(|t| t.as_array()) {
                 for t in transactions {
@@ -424,7 +460,7 @@ impl FireflyClient {
             }
         }
 
-        // Process spent transactions (withdrawals)
+        // Process spent transactions (withdrawal)
         for tx in &spent_transactions {
             if let Some(transactions) = tx.get("attributes").and_then(|a| a.get("transactions")).and_then(|t| t.as_array()) {
                 for t in transactions {
