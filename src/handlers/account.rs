@@ -124,7 +124,7 @@ pub async fn get_earned_spent(
         }
     }
 
-    log::info!("Filtering by {} accounts", account_ids.len());
+    log::info!("Parsed earned/spent params: start={:?}, end={:?}, period={:?}, accounts={}", start, end, period, account_ids.len());
 
     match client.get_earned_spent(start, end, period, Some(account_ids)).await {
         Ok(history) => HttpResponse::Ok().json(history),

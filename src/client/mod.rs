@@ -252,6 +252,8 @@ impl FireflyClient {
 
         let period = period.unwrap_or_else(|| "1D".to_string());
 
+        log::info!("Fetching earned/spent data: start={}, end={}, period={}, account_ids={:?}", start, end, period, account_ids);
+
         // Fetch all transactions (optionally filtered by account IDs)
         let all_transactions = self.fetch_all_transactions(&headers, &start, &end, account_ids.as_ref()).await?;
 

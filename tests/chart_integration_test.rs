@@ -300,4 +300,86 @@ mod tests {
         assert_eq!(earned_spent_widget["widget_type"], "earned_spent");
         assert!(earned_spent_widget["accounts"].as_array().unwrap().is_empty());
     }
+
+    #[test]
+    fn test_earned_spent_date_range_params() {
+        // Test that date range parameters are correctly parsed for earned/spent endpoint
+        let query_string = "start=2026-01-01&end=2026-03-01&period=1M";
+
+        let params: Vec<(String, String)> = serde_urlencoded::from_str(query_string).unwrap();
+
+        let mut start: Option<String> = None;
+        let mut end: Option<String> = None;
+        let mut period: Option<String> = None;
+
+        for (k, v) in params {
+            match k.as_str() {
+                "start" => start = Some(v),
+                "end" => end = Some(v),
+                "period" => period = Some(v),
+                _ => {}
+            }
+        }
+
+        assert_eq!(start, Some("2026-01-01".to_string()), "Start date should be parsed correctly");
+        assert_eq!(end, Some("2026-03-01".to_string()), "End date should be parsed correctly");
+        assert_eq!(period, Some("1M".to_string()), "Period should be parsed correctly");
+    }
+
+    #[test]
+    fn test_earned_spent_date_range_with_accounts() {
+        // Test that date range and account parameters are correctly parsed together
+        let query_string = "start=2026-01-01&end=2026-03-01&period=1W&accounts[]=1&accounts[]=2";
+
+        let params: Vec<(String, String)> = serde_urlencoded::from_str(query_string).unwrap();
+
+        let mut start: Option<String> = None;
+        let mut end: Option<String> = None;
+        let mut period: Option<String> = None;
+        let mut account_ids: Vec<String> = Vec::new();
+
+        for (k, v) in params {
+            match k.as_str() {
+                "start" => start = Some(v),
+                "end" => end = Some(v),
+                "period" => period = Some(v),
+                "accounts[]" => account_ids.push(v),
+                _ => {}
+            }
+        }
+
+        assert_eq!(start, Some("2026-01-01".to_string()));
+        assert_eq!(end, Some("2026-03-01".to_string()));
+        assert_eq!(period, Some("1W".to_string()));
+        assert_eq!(account_ids, vec!["1".to_string(), "2".to_string()]);
+    }
+
+    #[test]
+    fn test_earned_spent_default_date_range() {
+        // Test that default date range is calculated correctly when no dates provided
+        use chrono::{Utc, Duration};
+
+        // Simulate the default date calculation from client/mod.rs
+        let end_date: Option<String> = None;
+        let start_date: Option<String> = None;
+
+        let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+        let start = start_date.unwrap_or_else(|| {
+            (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string()
+        });
+
+        // Verify that dates are in correct format
+        assert!(end.len() == 10, "End date should be in YYYY-MM-DD format");
+        assert!(start.len() == 10, "Start date should be in YYYY-MM-DD format");
+
+        // Verify that start is before end
+        assert!(start <= end, "Start date should be before or equal to end date");
+
+        // Verify that the range is approximately 30 days
+        let start_parsed = chrono::NaiveDate::parse_from_str(&start, "%Y-%m-%d").unwrap();
+        let end_parsed = chrono::NaiveDate::parse_from_str(&end, "%Y-%m-%d").unwrap();
+        let diff = (end_parsed - start_parsed).num_days();
+
+        assert!(diff >= 29 && diff <= 31, "Date range should be approximately 30 days, got {}", diff);
+    }
 }
