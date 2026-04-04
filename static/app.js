@@ -394,10 +394,21 @@ function generateColors(count) {
 }
 
 // Extract chart data from entries (handles both object and array formats)
-function extractChartData(entries, length) {
+// For object format, data is extracted in the order of the provided labels to ensure alignment
+function extractChartData(entries, labels = []) {
     if (Array.isArray(entries)) {
         return entries.map(e => parseFloat(e.value || 0));
+    } else if (labels && labels.length > 0) {
+        // Use labels to extract values in the correct order
+        return labels.map(label => {
+            const v = entries[label];
+            if (typeof v === 'object' && v !== null) {
+                return parseFloat(v.value || 0);
+            }
+            return parseFloat(v || 0);
+        });
     } else {
+        // Fallback: use Object.values (may not preserve order for all cases)
         return Object.values(entries).map(v => {
             if (typeof v === 'object' && v !== null) {
                 return parseFloat(v.value || 0);
@@ -433,8 +444,8 @@ function renderEarnedSpentChart(ctx, history) {
         return;
     }
 
-    const earnedData = earnedDataset ? extractChartData(earnedDataset.entries, labels.length) : new Array(labels.length).fill(0);
-    const spentData = spentDataset ? extractChartData(spentDataset.entries, labels.length) : new Array(labels.length).fill(0);
+    const earnedData = earnedDataset ? extractChartData(earnedDataset.entries, labels) : new Array(labels.length).fill(0);
+    const spentData = spentDataset ? extractChartData(spentDataset.entries, labels) : new Array(labels.length).fill(0);
 
     // Earned is typically positive (income), spent is typically positive (expense)
     // We'll show earned in green and spent in red
