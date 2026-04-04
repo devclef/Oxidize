@@ -38,6 +38,8 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::account::refresh_balance_history)
             .service(handlers::account::refresh_all)
             .service(handlers::account::get_earned_spent)
+            .service(handlers::account::get_expenses_by_category)
+            .service(handlers::account::get_net_worth)
             .service(handlers::dashboard::dashboard)
             .service(handlers::widget::list_widgets)
             .service(handlers::widget::create_widget)
