@@ -228,6 +228,85 @@ async function fetchChartData() {
             return;
         }
 
+        // For expenses_by_category widget type
+        if (widgetType === 'expenses_by_category') {
+            selectedIds.forEach(id => params.append('accounts[]', id));
+
+            if (startDate) params.append('start', startDate);
+            if (endDate) params.append('end', endDate);
+
+            let url = '/api/expenses-by-category';
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            console.log('=== FETCHING EXPENSES BY CATEGORY DATA ===');
+            console.log('URL:', url);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status} ${response.statusText}`);
+            }
+            const categories = await response.json();
+
+            console.log('=== EXPENSES BY CATEGORY DATA FETCHED ===');
+            console.log('Received categories:', categories);
+
+            if (!categories || categories.length === 0) {
+                console.warn('No expenses by category data returned from API');
+                chartError.innerHTML = '<div class="info">No expenses by category data found for the current date range.</div>';
+                chartContainer.style.display = 'block';
+                if (balanceChart) {
+                    balanceChart.destroy();
+                    balanceChart = null;
+                }
+                return;
+            }
+
+            chartContainer.style.display = 'block';
+            renderChart(categories, widgetType);
+            return;
+        }
+
+        // For net_worth widget type
+        if (widgetType === 'net_worth') {
+            if (startDate) params.append('start', startDate);
+            if (endDate) params.append('end', endDate);
+            if (interval && interval !== 'auto') params.append('period', interval);
+
+            let url = '/api/net-worth';
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+
+            console.log('=== FETCHING NET WORTH DATA ===');
+            console.log('URL:', url);
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status} ${response.statusText}`);
+            }
+            const netWorth = await response.json();
+
+            console.log('=== NET WORTH DATA FETCHED ===');
+            console.log('Received net worth:', netWorth);
+
+            if (!netWorth || netWorth.length === 0) {
+                console.warn('No net worth data returned from API');
+                chartError.innerHTML = '<div class="info">No net worth data found for the current date range.</div>';
+                chartContainer.style.display = 'block';
+                if (balanceChart) {
+                    balanceChart.destroy();
+                    balanceChart = null;
+                }
+                return;
+            }
+
+            chartContainer.style.display = 'block';
+            renderChart(netWorth, widgetType);
+            return;
+        }
+
         if (selectedIds.length > 0) {
             selectedIds.forEach(id => params.append('accounts[]', id));
         } else if (chartMode === 'split') {
@@ -438,6 +517,202 @@ function renderEarnedSpentChart(ctx, history) {
     });
 }
 
+// Render expenses by category chart (horizontal bar chart)
+function renderExpensesByCategoryChart(ctx, categories) {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const chartTextColor = isDark ? '#eaeaea' : '#333';
+    const chartGridColor = isDark ? '#444' : '#ddd';
+
+    // Categories is an array of {name, amount, currency_symbol, currency_code}
+    if (!categories || categories.length === 0) {
+        console.warn('No category data to render');
+        return;
+    }
+
+    // Sort by amount descending for better visualization
+    const sortedCategories = [...categories].sort((a, b) => b.amount - a.amount);
+
+    const labels = sortedCategories.map(c => c.name);
+    const data = sortedCategories.map(c => c.amount);
+    const currencySymbol = sortedCategories[0]?.currency_symbol || '';
+
+    // Generate colors for each category
+    const colors = [];
+    const hues = [210, 280, 330, 120, 60, 30, 190, 260, 300, 40]; // Blue, Purple, Pink, Green, Orange, Red, etc.
+    sortedCategories.forEach((_, i) => {
+        const hue = hues[i % hues.length];
+        colors.push(isDark ? `hsl(${hue}, 60%, 60%)` : `hsl(${hue}, 70%, 50%)`);
+    });
+
+    // Destroy existing chart
+    if (balanceChart) {
+        balanceChart.destroy();
+    }
+
+    balanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Expenses',
+                data: data,
+                backgroundColor: colors,
+                borderColor: colors.map(c => c.replace('60%', '40%').replace('50%', '40%')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y', // Horizontal bar chart
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: chartGridColor },
+                    ticks: {
+                        color: chartTextColor,
+                        callback: function(value) {
+                            return currencySymbol + value.toLocaleString();
+                        }
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: {
+                        color: chartTextColor,
+                        maxRotation: 0
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return currencySymbol + context.parsed.x.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Render net worth chart (line chart)
+function renderNetWorthChart(ctx, history) {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const chartTextColor = isDark ? '#eaeaea' : '#333';
+    const chartGridColor = isDark ? '#444' : '#ddd';
+
+    // Extract labels and data from history
+    let labels = [];
+    let data = [];
+    let currencySymbol = '';
+
+    if (history && history.length > 0) {
+        const dataset = history[0];
+        currencySymbol = dataset.currency_symbol || '';
+
+        if (Array.isArray(dataset.entries)) {
+            labels = dataset.entries.map(e => e.date || e.key);
+            data = dataset.entries.map(e => parseFloat(e.ba || e.value || 0));
+        } else if (typeof dataset.entries === 'object') {
+            labels = Object.keys(dataset.entries);
+            data = Object.values(dataset.entries).map(v => {
+                if (typeof v === 'object' && v !== null) {
+                    return parseFloat(v.ba || v.value || 0);
+                }
+                return parseFloat(v);
+            });
+        }
+    }
+
+    if (labels.length === 0) {
+        console.warn('No net worth data to render');
+        return;
+    }
+
+    // Sort by date
+    const sortedIndices = labels.map((_, i) => i).sort((a, b) => {
+        const dateA = new Date(labels[a]);
+        const dateB = new Date(labels[b]);
+        return dateA - dateB;
+    });
+
+    labels = sortedIndices.map(i => labels[i]);
+    data = sortedIndices.map(i => data[i]);
+
+    const netWorthColor = isDark ? '#5dade2' : '#3498db';
+
+    // Destroy existing chart
+    if (balanceChart) {
+        balanceChart.destroy();
+    }
+
+    balanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Net Worth',
+                data: data,
+                borderColor: netWorthColor,
+                backgroundColor: netWorthColor + '20',
+                borderWidth: 2,
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: chartGridColor },
+                    ticks: {
+                        color: chartTextColor,
+                        callback: function(value) {
+                            return currencySymbol + value.toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    grid: { color: chartGridColor },
+                    ticks: {
+                        color: chartTextColor,
+                        maxRotation: 45,
+                        minRotation: 45,
+                        callback: function(value) {
+                            const date = new Date(value);
+                            return date.toLocaleDateString();
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: { color: chartTextColor }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.parsed.y !== null) {
+                                return 'Net Worth: ' + currencySymbol + context.parsed.y.toLocaleString();
+                            }
+                            return '';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 function renderChart(history, widgetType = 'balance') {
     const ctx = document.getElementById('balanceChart').getContext('2d');
     const chartMode = document.querySelector('input[name="chart-mode"]:checked')?.value || 'combined';
@@ -445,6 +720,18 @@ function renderChart(history, widgetType = 'balance') {
     // For earned_spent widget type, render as a bar chart
     if (widgetType === 'earned_spent') {
         renderEarnedSpentChart(ctx, history);
+        return;
+    }
+
+    // For expenses_by_category widget type, render as a horizontal bar chart
+    if (widgetType === 'expenses_by_category') {
+        renderExpensesByCategoryChart(ctx, history);
+        return;
+    }
+
+    // For net_worth widget type, render as a line chart
+    if (widgetType === 'net_worth') {
+        renderNetWorthChart(ctx, history);
         return;
     }
 
@@ -1244,7 +1531,7 @@ async function saveGraphAsWidget() {
     const selectedCheckboxes = document.querySelectorAll('.account-select:checked');
     const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-    // For earned vs spent widget type, accounts are not required
+    // Only balance widget type requires accounts
     if (widgetType === 'balance' && selectedIds.length === 0) {
         alert('Please select at least one account');
         return;
@@ -1413,7 +1700,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const widgetType = widgetTypeSelect.value;
             const chartTitle = document.getElementById('chart-title');
             if (chartTitle) {
-                chartTitle.textContent = widgetType === 'earned_spent' ? 'Earned vs Spent' : 'Account Balance History';
+                const titles = {
+                    'balance': 'Account Balance History',
+                    'earned_spent': 'Earned vs Spent',
+                    'expenses_by_category': 'Expenses by Category',
+                    'net_worth': 'Net Worth'
+                };
+                chartTitle.textContent = titles[widgetType] || 'Account Balance History';
             }
             fetchChartData();
         });
