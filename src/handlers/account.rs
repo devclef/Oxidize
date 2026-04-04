@@ -124,8 +124,17 @@ pub async fn get_earned_spent(
             "start" => start = Some(v),
             "end" => end = Some(v),
             "period" => period = Some(v),
-            "accounts[]" => account_ids.push(v),
-            _ => {}
+            "accounts[]" | "accounts" => {
+                log::info!("Found account ID: {}", v);
+                account_ids.push(v);
+            }
+            _ => {
+                // Check for URL-encoded variants of accounts[]
+                if k == "accounts%5B%5D" {
+                    log::info!("Found URL-encoded account ID: {}", v);
+                    account_ids.push(v);
+                }
+            }
         }
     }
 
@@ -164,8 +173,17 @@ pub async fn get_expenses_by_category(
         match k.as_str() {
             "start" => start = Some(v),
             "end" => end = Some(v),
-            "accounts[]" => account_ids.push(v),
-            _ => {}
+            "accounts[]" | "accounts" => {
+                log::info!("Found account ID: {}", v);
+                account_ids.push(v);
+            }
+            _ => {
+                // Check for URL-encoded variants of accounts[]
+                if k == "accounts%5B%5D" {
+                    log::info!("Found URL-encoded account ID: {}", v);
+                    account_ids.push(v);
+                }
+            }
         }
     }
 

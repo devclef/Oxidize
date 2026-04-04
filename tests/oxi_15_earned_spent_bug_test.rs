@@ -54,7 +54,9 @@ mod tests {
         // Extract period keys from transaction dates (this is what get_period_key does)
         let mut extracted_keys = Vec::new();
         for date_str in &transaction_dates {
-            if let Ok(date) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00") {
+            if let Ok(date) =
+                chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
+            {
                 let period_key = date.format("%Y-%m-01T00:00:00+00:00").to_string();
                 extracted_keys.push(period_key);
             }
@@ -115,7 +117,9 @@ mod tests {
         ];
 
         for (date_str, amount) in &transactions {
-            if let Ok(date) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00") {
+            if let Ok(date) =
+                chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
+            {
                 let period_key = date.format("%Y-%m-01T00:00:00+00:00").to_string();
                 *earned_entries.entry(period_key).or_insert(0.0) += amount;
             }
@@ -155,8 +159,7 @@ mod tests {
         let end_date = "2025-12-31";
         let period = "1M";
 
-        let mut entries: std::collections::HashMap<String, f64> =
-            std::collections::HashMap::new();
+        let mut entries: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
 
         // Generate all period keys and initialize with 0
         let mut current = NaiveDate::parse_from_str(start_date, "%Y-%m-%d").unwrap();
@@ -190,14 +193,20 @@ mod tests {
         ];
 
         for (date_str, amount) in &transactions {
-            if let Ok(date) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00") {
+            if let Ok(date) =
+                chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
+            {
                 let period_key = date.format("%Y-%m-01T00:00:00+00:00").to_string();
                 *entries.entry(period_key).or_insert(0.0) += amount;
             }
         }
 
         // Verify all 12 months are still present
-        assert_eq!(entries.len(), 12, "Should still have all 12 months after adding transactions");
+        assert_eq!(
+            entries.len(),
+            12,
+            "Should still have all 12 months after adding transactions"
+        );
 
         // Verify months with transactions have correct values
         assert_eq!(entries.get("2025-01-01T00:00:00+00:00"), Some(&1000.0));
