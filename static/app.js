@@ -1,4 +1,3 @@
-import { calculateRelativeDates, applyDateRange } from './date-utils.js';
 let allAccounts = [];
 let balanceChart = null;
 let enableComparison = false;
@@ -182,6 +181,7 @@ async function fetchChartData() {
     // Get date range and interval
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
+    const interval = document.getElementById('interval-select').value;
     const interval = document.getElementById('interval-select').value;
 
     // Get comparison dates if enabled
@@ -1588,6 +1588,7 @@ async function saveGraphAsWidget() {
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
     const interval = document.getElementById('interval-select').value;
+    const interval = document.getElementById('interval-select').value;
 
     // Get comparison dates if enabled
     const comparisonStartDate = enableComparison ? document.getElementById('comparison-start-date').value : null;
@@ -1798,6 +1799,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (enableComparisonCheckbox) {
         enableComparisonCheckbox.addEventListener('change', toggleComparisonControls);
     }
+    }
 
     const fetchAccountsBtn = document.getElementById('fetch-accounts-btn');
     const updateChartBtn = document.getElementById('update-chart-btn');
@@ -1839,14 +1841,6 @@ document.addEventListener('DOMContentLoaded', () => {
     selectAllBtn.addEventListener('click', selectAllAccounts);
     deselectAllBtn.addEventListener('click', deselectAllAccounts);
     toggleAccountsBtn.addEventListener('click', toggleAccountsSection);
-    
-    // Handle date range change
-    const dateRangeSelect = document.getElementById('date-range-select');
-    if (dateRangeSelect) {
-        dateRangeSelect.addEventListener('change', (e) => {
-            applyDateRange(e.target.value);
-        });
-    }
 
     // Handle chart mode change
     document.querySelectorAll('input[name="chart-mode"]').forEach(radio => {
