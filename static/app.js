@@ -1,3 +1,4 @@
+import { calculateRelativeDates, applyDateRange } from './date-utils.js';
 let allAccounts = [];
 let balanceChart = null;
 let enableComparison = false;
@@ -1838,6 +1839,14 @@ document.addEventListener('DOMContentLoaded', () => {
     selectAllBtn.addEventListener('click', selectAllAccounts);
     deselectAllBtn.addEventListener('click', deselectAllAccounts);
     toggleAccountsBtn.addEventListener('click', toggleAccountsSection);
+    
+    // Handle date range change
+    const dateRangeSelect = document.getElementById('date-range-select');
+    if (dateRangeSelect) {
+        dateRangeSelect.addEventListener('change', (e) => {
+            applyDateRange(e.target.value);
+        });
+    }
 
     // Handle chart mode change
     document.querySelectorAll('input[name="chart-mode"]').forEach(radio => {
