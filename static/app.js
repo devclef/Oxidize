@@ -1797,7 +1797,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (enableComparisonCheckbox) {
         enableComparisonCheckbox.addEventListener('change', toggleComparisonControls);
     }
-    }
 
     const fetchAccountsBtn = document.getElementById('fetch-accounts-btn');
     const updateChartBtn = document.getElementById('update-chart-btn');
