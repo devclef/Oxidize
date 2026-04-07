@@ -22,7 +22,7 @@ pub async fn get_monthly_summary(
     let now = chrono::Utc::now();
     let month = query.month.unwrap_or(now.month());
     let year = query.year.unwrap_or(now.year());
-    
+
     // Parse account IDs if provided
     let account_ids = query.account_ids.as_ref().map(|ids| {
         ids.split(',')
@@ -40,8 +40,7 @@ pub async fn get_monthly_summary(
 /// GET endpoint for the summary page
 #[get("/summary")]
 pub async fn summary(config: web::Data<Config>) -> HttpResponse {
-    let html = std::fs::read_to_string("./static/summary.html")
-        .unwrap_or_else(|_| "<h1>Error loading page</h1>".to_string());
+    let html = include_str!("../../static/summary.html");
 
     // Inject config as a script tag before the closing head tag
     let config_script = format!(
@@ -59,5 +58,5 @@ pub async fn summary(config: web::Data<Config>) -> HttpResponse {
 
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(html)
+        .body(html.to_string())
 }
