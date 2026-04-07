@@ -172,10 +172,6 @@ async function fetchAccounts() {
 
 async function fetchChartData(accountIds, startDate, endDate, interval) {
     const params = new URLSearchParams();
-            // Add account IDs if specified
-            if (widget.accounts && Array.isArray(widget.accounts)) {
-                widget.accounts.forEach(id => params.append('accounts[]', id));
-            }
 
     accountIds.forEach(id => params.append('accounts[]', id));
     if (startDate) params.append('start', startDate);
