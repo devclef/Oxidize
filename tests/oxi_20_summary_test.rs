@@ -170,10 +170,7 @@ mod tests {
             client_rs.contains("total_expenses"),
             "Should calculate total_expenses"
         );
-        assert!(
-            client_rs.contains("savings"),
-            "Should calculate savings"
-        );
+        assert!(client_rs.contains("savings"), "Should calculate savings");
         assert!(
             client_rs.contains("savings_rate"),
             "Should calculate savings_rate"

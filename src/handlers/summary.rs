@@ -10,6 +10,7 @@ pub struct SummaryQuery {
     month: Option<u32>,
     year: Option<i32>,
     account_ids: Option<String>,
+    account_type: Option<String>,
 }
 
 /// GET endpoint for monthly summary data
@@ -31,7 +32,10 @@ pub async fn get_monthly_summary(
             .collect()
     });
 
-    match client.get_monthly_summary(month, year, account_ids).await {
+    match client
+        .get_monthly_summary(month, year, account_ids, query.account_type.clone())
+        .await
+    {
         Ok(data) => HttpResponse::Ok().json(data),
         Err(e) => HttpResponse::InternalServerError().body(e),
     }
