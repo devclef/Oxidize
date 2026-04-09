@@ -29,10 +29,3 @@ pub struct ChartOptions {
     pub begin_at_zero: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SavedList {
-    pub id: String,
-    pub name: String,
-    pub accounts: serde_json::Value,
-    pub created_at: String,
-}

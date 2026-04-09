@@ -1,7 +1,6 @@
 let allAccounts = [];
 let balanceChart = null;
 let enableComparison = false;
-const SAVED_LISTS_KEY = 'firefly_saved_account_lists';
 const DASHBOARD_WIDGETS_KEY = 'oxidize_dashboard_widgets';
 
 // UUID polyfill for browsers that don't support crypto.randomUUID
@@ -1370,132 +1369,6 @@ async function deleteListFromStorage(id) {
     }
 }
 
-async function updateSavedListsDropdown() {
-    const select = document.getElementById('saved-lists-select');
-    const lists = await getSavedLists();
-
-    select.innerHTML = '<option value="">-- Select saved list --</option>';
-    lists.forEach(list => {
-        const option = document.createElement('option');
-        option.value = list.id;
-        option.textContent = list.name;
-        select.appendChild(option);
-    });
-}
-
-async function saveCurrentSelection() {
-    const listName = document.getElementById('list-name-input').value.trim();
-    if (!listName) {
-        alert('Please enter a name for the list');
-        return;
-    }
-
-    const selectedCheckboxes = document.querySelectorAll('.account-select:checked');
-    const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-
-    if (selectedIds.length === 0) {
-        alert('Please select at least one account');
-        return;
-    }
-
-    // Also save account details for reference
-    const selectedAccounts = selectedIds.map(id => {
-        const account = allAccounts.find(a => a.id === id);
-        return {
-            id: id,
-            name: account ? account.name : 'Unknown',
-            type: account ? account.account_type : 'Unknown'
-        };
-    });
-
-    const list = {
-        id: generateUUID(),
-        name: listName,
-        accounts: {
-            ids: selectedIds,
-            accounts: selectedAccounts,
-            savedAt: new Date().toISOString()
-        },
-        created_at: new Date().toISOString()
-    };
-
-    try {
-        await saveListToStorage(list);
-        await updateSavedListsDropdown();
-        document.getElementById('list-name-input').value = '';
-        alert(`Saved list "${listName}" with ${selectedIds.length} accounts`);
-    } catch (e) {
-        alert(`Failed to save list: ${e.message}`);
-    }
-}
-
-async function loadSavedList() {
-    const select = document.getElementById('saved-lists-select');
-    const listId = select.value;
-
-    if (!listId) {
-        alert('Please select a list to load');
-        return;
-    }
-
-    const lists = await getSavedLists();
-    const listData = lists.find(l => l.id === listId);
-
-    if (!listData) {
-        alert('List not found');
-        return;
-    }
-
-    // Extract account IDs from the stored data
-    const accountData = listData.accounts;
-    const accountIds = accountData.ids || (Array.isArray(accountData) ? accountData : []);
-
-    // Fetch all accounts if we don't have any loaded
-    if (allAccounts.length === 0) {
-        await fetchAccounts();
-    }
-
-    // Uncheck all checkboxes first
-    document.querySelectorAll('.account-select').forEach(cb => cb.checked = false);
-
-    // Check the saved accounts
-    let foundCount = 0;
-    accountIds.forEach(id => {
-        const checkbox = document.querySelector(`.account-select[value="${id}"]`);
-        if (checkbox) {
-            checkbox.checked = true;
-            foundCount++;
-        }
-    });
-
-    if (foundCount === 0) {
-        alert('None of the accounts in this list were found. You may need to fetch accounts first.');
-    } else if (foundCount < accountIds.length) {
-        alert(`Loaded ${foundCount} of ${accountIds.length} accounts from the list.`);
-    }
-}
-
-async function deleteSavedList() {
-    const select = document.getElementById('saved-lists-select');
-    const listId = select.value;
-
-    if (!listId) {
-        alert('Please select a list to delete');
-        return;
-    }
-
-    const lists = await getSavedLists();
-    const listData = lists.find(l => l.id === listId);
-
-    if (!listData) {
-        alert('List not found');
-        return;
-    }
-
-    if (confirm(`Delete list "${listData.name}"?`)) {
-        try {
-            await deleteListFromStorage(listId);
-            await updateSavedListsDropdown();
         } catch (e) {
             alert(`Failed to delete list: ${e.message}`);
         }
@@ -1834,9 +1707,6 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchAccountsBtn.addEventListener('click', fetchAccounts);
     updateChartBtn.addEventListener('click', fetchChartData);
     refreshDataBtn.addEventListener('click', refreshData);
-    saveListBtn.addEventListener('click', saveCurrentSelection);
-    loadListBtn.addEventListener('click', loadSavedList);
-    deleteListBtn.addEventListener('click', deleteSavedList);
     selectAllBtn.addEventListener('click', selectAllAccounts);
     deselectAllBtn.addEventListener('click', deselectAllAccounts);
     toggleAccountsBtn.addEventListener('click', toggleAccountsSection);
@@ -1876,7 +1746,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Load saved lists dropdown
-    updateSavedListsDropdown();
 
     // Auto-fetch accounts if configured
     if (CONFIG.autoFetchAccounts) {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use crate::models::widget::ChartOptions;
-use crate::models::{SavedList, Widget};
+use crate::models::Widget;
 
 static DATA_DIR: OnceLock<String> = OnceLock::new();
 
@@ -55,18 +55,6 @@ fn init_db(conn: &Connection) {
         "ALTER TABLE widgets ADD COLUMN widget_type TEXT DEFAULT 'balance'",
         [],
     ); // Ignore error if column already exists
-
-    // Create saved_lists table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS saved_lists (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            accounts TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )",
-        [],
-    )
-    .expect("Failed to create saved_lists table");
 }
 
 // Helper function to deserialize chart options from JSON string
@@ -227,65 +215,6 @@ impl Storage {
 
             if rows == 0 {
                 return Err(format!("Widget with id {} not found", id));
-            }
-
-            Ok(())
-        })
-    }
-
-    // Saved Lists CRUD operations
-
-    pub fn get_all_saved_lists() -> Result<Vec<SavedList>, String> {
-        with_db(|conn| {
-            let mut stmt = conn
-                .prepare("SELECT id, name, accounts, created_at FROM saved_lists ORDER BY created_at DESC")
-                .map_err(|e| e.to_string())?;
-
-            let lists = stmt
-                .query_map([], |row| {
-                    let id: String = row.get(0)?;
-                    let name: String = row.get(1)?;
-                    let accounts_json: String = row.get(2)?;
-                    let created_at: String = row.get(3)?;
-
-                    let accounts: serde_json::Value =
-                        serde_json::from_str(&accounts_json).unwrap_or(serde_json::Value::Null);
-
-                    Ok(SavedList {
-                        id,
-                        name,
-                        accounts,
-                        created_at,
-                    })
-                })
-                .map_err(|e| e.to_string())?
-                .filter_map(|r: Result<SavedList, _>| r.ok())
-                .collect();
-
-            Ok(lists)
-        })
-    }
-
-    pub fn create_saved_list(list: &SavedList) -> Result<(), String> {
-        with_db(|conn| {
-            conn.execute(
-                "INSERT INTO saved_lists (id, name, accounts, created_at) VALUES (?1, ?2, ?3, ?4)",
-                params![&list.id, &list.name, &list.accounts, &list.created_at],
-            )
-            .map_err(|e| e.to_string())?;
-
-            Ok(())
-        })
-    }
-
-    pub fn delete_saved_list(id: &str) -> Result<(), String> {
-        with_db(|conn| {
-            let rows = conn
-                .execute("DELETE FROM saved_lists WHERE id = ?1", params![id])
-                .map_err(|e| e.to_string())?;
-
-            if rows == 0 {
-                return Err(format!("Saved list with id {} not found", id));
             }
 
             Ok(())

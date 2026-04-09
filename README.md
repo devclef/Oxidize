@@ -108,9 +108,6 @@ docker run -p 8080:8080 \
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/saved-lists` | List all saved account lists |
-| `POST` | `/api/saved-lists` | Create a new saved list |
-| `DELETE` | `/api/saved-lists/{id}` | Delete a saved list |
 
 ## Architecture
 

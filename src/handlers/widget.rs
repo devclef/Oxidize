@@ -1,6 +1,6 @@
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
-use crate::models::{SavedList, Widget};
+use crate::models::Widget;
 use crate::storage::Storage;
 
 // Widget endpoints
@@ -49,32 +49,3 @@ pub async fn delete_widget(path: web::Path<String>) -> impl Responder {
     }
 }
 
-// Saved Lists endpoints
-
-#[get("/api/saved-lists")]
-pub async fn list_saved_lists() -> impl Responder {
-    match Storage::get_all_saved_lists() {
-        Ok(lists) => HttpResponse::Ok().json(lists),
-        Err(e) => HttpResponse::InternalServerError().body(e),
-    }
-}
-
-#[post("/api/saved-lists")]
-pub async fn create_saved_list(body: web::Json<SavedList>) -> impl Responder {
-    let list = body.into_inner();
-
-    match Storage::create_saved_list(&list) {
-        Ok(()) => HttpResponse::Created().json(list),
-        Err(e) => HttpResponse::BadRequest().body(e),
-    }
-}
-
-#[delete("/api/saved-lists/{id}")]
-pub async fn delete_saved_list(path: web::Path<String>) -> impl Responder {
-    let id = path.into_inner();
-
-    match Storage::delete_saved_list(&id) {
-        Ok(()) => HttpResponse::Ok().finish(),
-        Err(e) => HttpResponse::NotFound().body(e),
-    }
-}

@@ -74,7 +74,6 @@ docker run -p 8080:8080 --env-file .env oxidize
 - Cache keys include account type filter, date range, and period
 
 **Storage Layer**: `src/storage.rs`
-- SQLite-based persistence for widgets and saved account lists
 - Uses `dirs` crate to determine data directory location
 
 **Data Models**: `src/models/`
@@ -144,7 +143,6 @@ Optional:
 - `DELETE /api/widgets/{id}` - Deletes a widget
 
 ### Saved Lists
-- `GET /api/saved-lists` - Lists all saved account lists
 - `POST /api/saved-lists` - Creates a new saved list
 - `DELETE /api/saved-lists/{id}` - Deletes a saved list
 
