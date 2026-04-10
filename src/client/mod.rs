@@ -454,6 +454,7 @@ impl FireflyClient {
         }])
     }
 
+    
     pub async fn get_monthly_summary(
         &self,
         month: u32,
@@ -498,6 +499,33 @@ impl FireflyClient {
             }
         }
 
+        let mut selected_account_ids = std::collections::HashSet::new();
+        if let Some(ref ids) = account_ids {
+            for id in ids {
+                selected_account_ids.insert(id.clone());
+            }
+        } else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+
         let url = format!("{}/v1/transactions", self.config.firefly_url);
         let income_response = self
             .client
@@ -521,8 +549,185 @@ impl FireflyClient {
         let expense_data: serde_json::Value =
             expense_response.json().await.map_err(|e| e.to_string())?;
 
-        let total_income = Self::sum_transaction_amounts(&income_data);
-        let total_expenses = Self::sum_transaction_amounts(&expense_data);
+        let total_income = Self::sum_filtered_transaction_amounts(&income_data, &selected_account_ids, true);
+        let total_expenses = Self::sum_filtered_transaction_amounts(&expense_data, &selected_account_ids, false);
+        let savings = total_income - total_expenses;
+        let savings_rate = if total_income > 0.0 {
+            (savings / total_income) * 100.0
+        } else {
+            0.0
+        };
+        let (currency_symbol, currency_code) =
+            Self::get_currency_from_transactions(&income_data, &expense_data);
+
+        let month_name = match month {
+            1 => "January",
+            2 => "February",
+            3 => "March",
+            4 => "April",
+            5 => "May",
+            6 => "June",
+            7 => "July",
+            8 => "August",
+            9 => "September",
+            10 => "October",
+            11 => "November",
+            12 => "December",
+            _ => "Unknown",
+        };
+
+        Ok(MonthlySummary {
+            month: month_name.to_string(),
+            year,
+            total_income,
+            total_expenses,
+            savings,
+            savings_rate,
+            currency_symbol,
+            currency_code,
+        })
+    }
+ else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+
+        } else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+
+        } else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+        let mut selected_account_ids = std::collections::HashSet::new();
+        if let Some(ref ids) = account_ids {
+            for id in ids {
+                selected_account_ids.insert(id.clone());
+            }
+        } else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+ 
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+
+
+        } else if let Some(ref t) = account_type {
+            if t != "all" {
+                if let Ok(accounts) = self.get_accounts(Some(t.clone())).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            } else {
+                if let Ok(accounts) = self.get_accounts(None).await {
+                    for acc in accounts {
+                        selected_account_ids.insert(acc.id);
+                    }
+                }
+            }
+        } else {
+            if let Ok(accounts) = self.get_accounts(None).await {
+                for acc in accounts {
+                    selected_account_ids.insert(acc.id);
+                }
+            }
+        }
+
+        let url = format!("{}/v1/transactions", self.config.firefly_url);
+        let income_response = self
+            .client
+            .get(&url)
+            .headers(self.get_headers())
+            .query(&income_query)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let income_data: serde_json::Value =
+            income_response.json().await.map_err(|e| e.to_string())?;
+
+        let expense_response = self
+            .client
+            .get(&url)
+            .headers(self.get_headers())
+            .query(&expense_query)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let expense_data: serde_json::Value =
+            expense_response.json().await.map_err(|e| e.to_string())?;
+
+        let total_income = Self::sum_filtered_transaction_amounts(&income_data, &selected_account_ids, true);
+        let total_expenses = Self::sum_filtered_transaction_amounts(&expense_data, &selected_account_ids, false);
         let savings = total_income - total_expenses;
         let savings_rate = if total_income > 0.0 {
             (savings / total_income) * 100.0
@@ -785,7 +990,12 @@ impl FireflyClient {
         Ok(keys)
     }
 
-    fn sum_transaction_amounts(data: &serde_json::Value) -> f64 {
+
+    fn sum_filtered_transaction_amounts(
+        data: &serde_json::Value,
+        selected_account_ids: &std::collections::HashSet<String>,
+        is_income: bool,
+    ) -> f64 {
         data.get("data")
             .and_then(|d| d.as_array())
             .map(|transactions| {
@@ -795,6 +1005,22 @@ impl FireflyClient {
                     .filter_map(|attr| attr.get("transactions"))
                     .filter_map(|trans_array| trans_array.as_array())
                     .flatten()
+                    .filter(|t| {
+                        if is_income {
+                            // For income (deposits), ignore if source is a selected account
+                            let source_id = t.get("source_id").and_then(|s| s.as_str());
+                            if let Some(id) = source_id {
+                                return !selected_account_ids.contains(id);
+                            }
+                        } else {
+                            // For expenses (withdrawals), ignore if destination is a selected account
+                            let dest_id = t.get("destination_id").and_then(|d| d.as_str());
+                            if let Some(id) = dest_id {
+                                return !selected_account_ids.contains(id);
+                            }
+                        }
+                        true
+                    })
                     .filter_map(|trans| trans.get("amount"))
                     .filter_map(|amt| amt.as_str())
                     .filter_map(|amt_str| amt_str.parse::<f64>().ok())
@@ -802,6 +1028,7 @@ impl FireflyClient {
             })
             .unwrap_or(0.0)
     }
+
 
     fn get_currency_from_transactions(
         income_data: &serde_json::Value,
