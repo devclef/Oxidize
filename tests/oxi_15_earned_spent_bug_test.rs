@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Datelike, Duration, NaiveDate};
+    use chrono::{Datelike, NaiveDate};
 
     #[test]
     fn test_period_key_generation_matches_transaction_dates() {
@@ -15,7 +15,7 @@ mod tests {
         // Simulate a date range: Jan 1, 2026 to Mar 31, 2026 with monthly periods
         let start_date = "2026-01-01";
         let end_date = "2026-03-31";
-        let period = "1M";
+        
 
         // Generate period keys for the range (this is what the backend does)
         let mut generated_keys = Vec::new();
@@ -85,7 +85,7 @@ mod tests {
 
         let start_date = "2026-01-01";
         let end_date = "2026-03-31";
-        let period = "1M";
+        
 
         // Initialize all periods with 0
         let mut earned_entries: std::collections::HashMap<String, f64> =
@@ -157,7 +157,7 @@ mod tests {
 
         let start_date = "2025-01-01";
         let end_date = "2025-12-31";
-        let period = "1M";
+        
 
         let mut entries: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
 

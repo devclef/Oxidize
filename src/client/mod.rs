@@ -60,7 +60,7 @@ impl FireflyClient {
             type_filter
         );
 
-        let mut headers = self.get_headers();
+        let headers = self.get_headers();
         let mut url = format!("{}/v1/accounts", self.config.firefly_url);
         if let Some(ref t) = type_filter {
             url = format!("{}?type={}", url, t);

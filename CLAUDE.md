@@ -186,9 +186,13 @@ Optional:
 When updating `static/style.css`, use CSS variables for theming features. After each edit, verify the file was updated before proceeding with subsequent edits to avoid stale content mismatches.
 
 ### File Editing
-- Always read the file before editing to ensure you have the latest content
-- If an edit fails with a parameter error, re-read the file and retry with the exact current content
-- For multi-step edits, consider using `replace_all` for repetitive pattern changes
+ - Always read the file before editing to ensure you have the latest content
+ - Use `apply_patch` with the following format:
+   - `@@ <context_line>`: A line that exists exactly as-is in the file
+   - `- <old_line>`: The line to remove
+   - `+ <new_line>`: The line to add
+ - If an edit fails with a parameter error, re-read the file and retry with the exact current content
+ - For multi-step edits, consider using `replace_all` for repetitive pattern changes
 
 ### Testing Mandate
 - **Always** write tests for new logic.
