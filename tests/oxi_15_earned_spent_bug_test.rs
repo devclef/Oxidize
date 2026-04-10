@@ -2,7 +2,6 @@
 ///
 /// This test reproduces the bug where only the most recent data is shown,
 /// and all previous data points are blank.
-
 #[cfg(test)]
 mod tests {
     use chrono::{Datelike, NaiveDate};

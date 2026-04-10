@@ -169,7 +169,7 @@ mod tests {
         let account_names = vec!["SEB Checking".to_string(), "Klarna Card".to_string()];
 
         // Simulate dataset labels from backend
-        let dataset_labels = vec![
+        let dataset_labels = [
             "SEB Checking".to_string(),
             "Klarna Card".to_string(),
             "earned".to_string(),
@@ -441,15 +441,8 @@ mod tests {
         use chrono::{Duration, Utc};
 
         // Simulate the default date calculation from client/mod.rs
-        let end_date: Option<String> = None;
-        let start_date: Option<String> = None;
-
-        let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
-        let start = start_date.unwrap_or_else(|| {
-            (Utc::now() - Duration::days(30))
-                .format("%Y-%m-%d")
-                .to_string()
-        });
+        let end = Utc::now().format("%Y-%m-%d").to_string();
+        let start = (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string();
 
         // Verify that dates are in correct format
         assert!(end.len() == 10, "End date should be in YYYY-MM-DD format");
@@ -470,7 +463,7 @@ mod tests {
         let diff = (end_parsed - start_parsed).num_days();
 
         assert!(
-            diff >= 29 && diff <= 31,
+            (29..=31).contains(&diff),
             "Date range should be approximately 30 days, got {}",
             diff
         );

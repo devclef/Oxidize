@@ -2,7 +2,6 @@
 ///
 /// This test file verifies that all API endpoints are properly registered
 /// to prevent 404 errors.
-
 #[cfg(test)]
 mod tests {
     #[test]

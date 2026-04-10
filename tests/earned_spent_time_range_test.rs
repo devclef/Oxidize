@@ -3,7 +3,6 @@
 /// This test file verifies that the earned/spent chart correctly shows data
 /// for each interval within the selected date range, filling in 0 for periods
 /// with no transactions.
-
 #[cfg(test)]
 mod tests {
     use chrono::{Datelike, Duration, NaiveDate};

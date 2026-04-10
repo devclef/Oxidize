@@ -56,15 +56,8 @@ mod tests {
     #[test]
     fn test_default_date_range_calculation() {
         // Test that default date range is calculated correctly
-        let end_date: Option<String> = None;
-        let start_date: Option<String> = None;
-
-        let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
-        let start = start_date.unwrap_or_else(|| {
-            (Utc::now() - Duration::days(30))
-                .format("%Y-%m-%d")
-                .to_string()
-        });
+        let end = Utc::now().format("%Y-%m-%d").to_string();
+        let start = (Utc::now() - Duration::days(30)).format("%Y-%m-%d").to_string();
 
         // Verify format
         assert_eq!(end.len(), 10);
@@ -79,7 +72,7 @@ mod tests {
         let diff = (end_parsed - start_parsed).num_days();
 
         assert!(
-            diff >= 29 && diff <= 31,
+            (29..=31).contains(&diff),
             "Date range should be ~30 days, got {}",
             diff
         );
@@ -149,7 +142,7 @@ mod tests {
     #[test]
     fn test_account_filtering() {
         // Test account type filtering
-        let accounts = vec![
+        let accounts = [
             serde_json::json!({"id": "1", "name": "Checking", "account_type": "asset"}),
             serde_json::json!({"id": "2", "name": "Credit Card", "account_type": "liability"}),
             serde_json::json!({"id": "3", "name": "Cash", "account_type": "cash"}),
@@ -206,7 +199,7 @@ mod tests {
     #[test]
     fn test_transaction_type_filtering() {
         // Test filtering transactions by type
-        let transactions = vec![
+        let transactions = [
             serde_json::json!({"type": "deposit", "amount": "100.00"}),
             serde_json::json!({"type": "withdrawal", "amount": "50.00"}),
             serde_json::json!({"type": "deposit", "amount": "200.00"}),

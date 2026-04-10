@@ -2,7 +2,6 @@
 ///
 /// This test file verifies that the summary page can filter by account types
 /// defined in the configuration.
-
 #[cfg(test)]
 mod tests {
 

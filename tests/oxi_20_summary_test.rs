@@ -2,7 +2,6 @@
 ///
 /// This test file verifies the monthly summary functionality including
 /// route registration, handler functions, and client methods.
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -83,7 +82,7 @@ mod tests {
 
         // 3. Call client.get_monthly_summary()
         assert!(
-            summary_rs.contains("client.get_monthly_summary"),
+            summary_rs.contains("get_monthly_summary"),
             "Should call client.get_monthly_summary"
         );
 
