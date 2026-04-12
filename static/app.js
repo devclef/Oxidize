@@ -23,9 +23,6 @@ const CONFIG = window.OXIDIZE_CONFIG || {
 };
 
 window.addEventListener("themeChanged", (e) => { updateChartTheme(e.detail); });
-    document.getElementById('theme-icon-sun').style.display = 'none';
-    document.getElementById('theme-icon-moon').style.display = 'block';
-}
 
 function updateChartTheme(theme) {
     const isDark = theme === 'dark';
