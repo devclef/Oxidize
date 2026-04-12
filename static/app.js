@@ -1322,13 +1322,8 @@ async function deleteListFromStorage(id) {
         }
     } catch (e) {
         console.error('Failed to delete list:', e);
+        alert(`Failed to delete list: ${e.message}`);
         throw e;
-    }
-}
-
-        } catch (e) {
-            alert(`Failed to delete list: ${e.message}`);
-        }
     }
 }
 
