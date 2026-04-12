@@ -109,7 +109,7 @@ async function fetchAccounts() {
 }
 
 async function fetchChartData() {
-    const chartContainer = document.querySelector('.chart-container');
+    const chartContainer = document.querySelector('.chart-wrapper');
     const chartError = document.getElementById('chart-error');
     const chartMode = document.querySelector('input[name="chart-mode"]:checked')?.value || 'combined';
 
