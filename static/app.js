@@ -1284,48 +1284,6 @@ function renderSplitLegend(accountInfo, datasets) {
     });
 }
 
-async function getSavedLists() {
-    try {
-        const response = await fetch('/api/saved-lists');
-        if (!response.ok) return [];
-        return await response.json();
-    } catch (e) {
-        console.error('Failed to fetch saved lists:', e);
-        return [];
-    }
-}
-
-async function saveListToStorage(list) {
-    try {
-        const response = await fetch('/api/saved-lists', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(list)
-        });
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || 'Failed to save list');
-        }
-        return response.json();
-    } catch (e) {
-        console.error('Failed to save list:', e);
-        throw e;
-    }
-}
-
-async function deleteListFromStorage(id) {
-    try {
-        const response = await fetch(`/api/saved-lists/${id}`, { method: 'DELETE' });
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || 'Failed to delete list');
-        }
-    } catch (e) {
-        console.error('Failed to delete list:', e);
-        alert(`Failed to delete list: ${e.message}`);
-        throw e;
-    }
-}
 
 // Dashboard widget functions
 async function getDashboardWidgets() {
@@ -1628,9 +1586,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchAccountsBtn = document.getElementById('fetch-accounts-btn');
     const updateChartBtn = document.getElementById('update-chart-btn');
     const refreshDataBtn = document.getElementById('refresh-data-btn');
-    const saveListBtn = document.getElementById('save-list-btn');
-    const loadListBtn = document.getElementById('load-list-btn');
-    const deleteListBtn = document.getElementById('delete-list-btn');
     const selectAllBtn = document.getElementById('select-all-btn');
     const deselectAllBtn = document.getElementById('deselect-all-btn');
     const toggleAccountsBtn = document.getElementById('toggle-accounts-btn');

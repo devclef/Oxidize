@@ -67,7 +67,7 @@ docker run -p 8080:8080 --env-file .env oxidize
 - `account.rs` - `/api/accounts`, `/api/accounts/balance-history`, and `/api/earned-spent` endpoints
 - `index.rs` - Serve the main HTML page
 - `dashboard.rs` - Serve the dashboard page
-- `widget.rs` - CRUD endpoints for widgets and saved lists
+- `widget.rs` - CRUD endpoints for widgets
 
 **Cache Layer**: `src/cache.rs`
 - `DataCache` provides in-memory caching for accounts and balance history
@@ -79,12 +79,12 @@ docker run -p 8080:8080 --env-file .env oxidize
 **Data Models**: `src/models/`
 - `account.rs` - `AccountArray`, `AccountRead`, `AccountAttributes`, `SimpleAccount`
 - `chart.rs` - `ChartLine` (alias for `Vec<ChartDataSet>`)
-- `widget.rs` - `Widget`, `ChartOptions`, `SavedList`
+- `widget.rs` - `Widget`, `ChartOptions`
 
 ### Frontend (Vanilla JS)
 
 **Static Files**: `static/`
-- `index.html` - Main UI with account filter, account list, saved lists, and chart
+- `index.html` - Main UI with account filter, account list, and chart
 - `dashboard.html` - Dashboard page for viewing saved widgets
 - `app.js` - Client-side logic for main page:
   - `fetchAccounts()` - Calls `/api/accounts` endpoint
@@ -102,7 +102,6 @@ docker run -p 8080:8080 --env-file .env oxidize
 1. **API Proxy Pattern**: Backend proxies requests to Firefly III, avoiding CORS issues
 2. **Data Aggregation**: Chart data from multiple datasets is aggregated into a single line
 3. **Anchor Balance Calculation**: Converts flow data to absolute balances by calculating backwards from current balance
-4. **Saved Lists**: Account selections persisted to browser localStorage
 
 ## Environment Variables
 
@@ -141,10 +140,6 @@ Optional:
 - `POST /api/widgets` - Creates a new widget
 - `PUT /api/widgets/{id}` - Updates an existing widget
 - `DELETE /api/widgets/{id}` - Deletes a widget
-
-### Saved Lists
-- `POST /api/saved-lists` - Creates a new saved list
-- `DELETE /api/saved-lists/{id}` - Deletes a saved list
 
 ### Cache
 - `POST /api/refresh` - Clears all caches
