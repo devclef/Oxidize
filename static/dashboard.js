@@ -1,6 +1,7 @@
 const DASHBOARD_WIDGETS_KEY = 'oxidize_dashboard_widgets';
 const SAVED_LISTS_KEY = 'firefly_saved_account_lists';
 let widgetCharts = {};
+let widgetDatasetVisibility = {};
 
 // Get config from server or use defaults
 const CONFIG = window.OXIDIZE_CONFIG || {
@@ -152,6 +153,71 @@ function generateColors(count) {
         colors.push(`hsl(${hue}, 70%, 50%)`);
     }
     return colors;
+}
+
+function renderSplitLegend(widgetId, accountInfo, datasets) {
+    const legendContainer = document.getElementById(`${widgetId}-legend`);
+    const legendItems = document.getElementById(`${widgetId}-legend-items`);
+
+    // Clear previous legend
+    legendItems.innerHTML = '';
+
+    if (accountInfo.length === 0) {
+        legendContainer.style.display = 'none';
+        return;
+    }
+
+    legendContainer.style.display = 'block';
+
+    // Initialize visibility for this widget if not already present
+    if (!widgetDatasetVisibility[widgetId]) {
+        widgetDatasetVisibility[widgetId] = {};
+        accountInfo.forEach((_, index) => {
+            widgetDatasetVisibility[widgetId][index] = true;
+        });
+    }
+
+    // Create legend item for each account
+    accountInfo.forEach((info, index) => {
+        const dataset = datasets[index];
+        if (!dataset) return;
+
+        const item = document.createElement('div');
+        item.className = `legend-item ${widgetDatasetVisibility[widgetId][index] ? 'active' : 'hidden'}`;
+        item.dataset.accountIndex = index;
+
+        const colorDiv = document.createElement('div');
+        colorDiv.className = 'legend-color';
+        colorDiv.style.backgroundColor = dataset.borderColor;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'legend-name';
+        nameSpan.textContent = info.name;
+
+        const toggleIcon = document.createElement('span');
+        toggleIcon.className = 'legend-toggle-icon';
+        toggleIcon.textContent = '▼';
+
+        item.appendChild(colorDiv);
+        item.appendChild(nameSpan);
+        item.appendChild(toggleIcon);
+
+        // Click handler to toggle visibility
+        item.addEventListener('click', () => {
+            // Toggle visibility
+            widgetDatasetVisibility[widgetId][index] = !widgetDatasetVisibility[widgetId][index];
+            dataset.hidden = !widgetDatasetVisibility[widgetId][index];
+            item.classList.toggle('active');
+            item.classList.toggle('hidden');
+
+            // Update chart
+            if (widgetCharts[widgetId]) {
+                widgetCharts[widgetId].update();
+            }
+        });
+
+        legendItems.appendChild(item);
+    });
 }
 
 function getChartOptions(widget) {
@@ -569,6 +635,9 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     }
                 }
             });
+
+            // Render the legend after chart is created
+            renderSplitLegend(widget.id, accountInfo, datasets);
         }
     } catch (error) {
         console.error('Error rendering widget chart:', error);
@@ -672,6 +741,9 @@ async function renderDashboard() {
                     <div id="${widget.id}-error" style="color: #e74c3c; font-size: 0.85rem;"></div>
                     <div class="widget-chart">
                         <canvas id="${widget.id}"></canvas>
+                    </div>
+                    <div class="chart-legend" id="${widget.id}-legend" style="display: none;">
+                        <div class="legend-container" id="${widget.id}-legend-items"></div>
                     </div>
                     <div class="widget-info">
                         ${widgetType === 'balance' ? `<div class="widget-accounts">${accountTags}</div>` : ''}
