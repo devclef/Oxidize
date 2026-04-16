@@ -717,10 +717,22 @@ impl FireflyClient {
             }
         }
 
+        fn parse_transaction_date(date_str: &str) -> Option<chrono::NaiveDateTime> {
+            // Try multiple ISO 8601 formats that Firefly III might return
+            chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%SZ"))
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3f+00:00"))
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3fZ"))
+                .or_else(|_| {
+                    // Try parsing just the date portion and default to midnight UTC
+                    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
+                })
+                .ok()
+        }
+
         let get_period_key = |date_str: &str, period: &str| -> String {
-            if let Ok(date) =
-                chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
-            {
+            if let Some(date) = parse_transaction_date(date_str) {
                 match period {
                     "1M" => date.format("%Y-%m-01T00:00:00+00:00").to_string(),
                     "1W" => {
@@ -731,6 +743,12 @@ impl FireflyClient {
                     _ => date.format("%Y-%m-%dT00:00:00+00:00").to_string(),
                 }
             } else {
+                // If all parsing fails, try to extract just the date portion
+                if let Some(date_part) = date_str.split('T').next() {
+                    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+                        return date.format("%Y-%m-%dT00:00:00+00:00").to_string();
+                    }
+                }
                 date_str.to_string()
             }
         };
