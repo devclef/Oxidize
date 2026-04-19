@@ -177,6 +177,23 @@ async function deleteWidget(id) {
     }
 }
 
+async function updateWidgetOrder(widgetIds) {
+    const updates = widgetIds.map((id, index) => {
+        const w = widgetsCache.find(w => w.id === id);
+        if (!w) return null;
+        w.display_order = index;
+        w.updated_at = new Date().toISOString();
+        return fetch(`/api/widgets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(w)
+        });
+    }).filter(Boolean);
+
+    await Promise.all(updates);
+    widgetsCache = widgetsCache.sort((a, b) => a.display_order - b.display_order);
+}
+
 function toggleWidgetSettings(id) {
     const settingsEl = document.getElementById(`${id}-settings`);
     if (settingsEl.style.display === 'none' || settingsEl.style.display === '') {
@@ -1056,6 +1073,32 @@ async function renderDashboard() {
             });
         }
     });
+
+    // Initialize SortableJS for drag-and-drop reordering
+    const grid = document.querySelector('.dashboard-grid');
+    if (grid && typeof Sortable !== 'undefined') {
+        if (grid._sortable) {
+            grid._sortable.destroy();
+        }
+
+        grid._sortable = Sortable.create(grid, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                const newOrder = [];
+                grid.querySelectorAll('.widget').forEach(el => {
+                    const id = el.getAttribute('data-widget-id');
+                    if (id) newOrder.push(id);
+                });
+
+                if (newOrder.length > 0) {
+                    updateWidgetOrder(newOrder);
+                }
+            }
+        });
+    }
 }
 
 // Initialize
