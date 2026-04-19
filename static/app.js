@@ -1230,8 +1230,6 @@ function renderChart(history, widgetType = 'balance') {
                     }
                 }
             }
-        },
-            plugins: [pctLabelPlugin]
         });
 
         // Render the legend after chart is created
@@ -1334,8 +1332,6 @@ function renderChart(history, widgetType = 'balance') {
                     }
                 }
             }
-        },
-            plugins: [pctLabelPlugin]
         });
     }
 }

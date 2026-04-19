@@ -681,8 +681,7 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                             }
                         }
                     }
-                },
-                plugins: [pctLabelPlugin]
+                }
             });
         } else {
             // Split mode - multiple lines
@@ -813,8 +812,6 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                         }
                     }
                 }
-            },
-                plugins: [pctLabelPlugin]
             });
 
             // Render the legend after chart is created
