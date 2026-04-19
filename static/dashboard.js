@@ -3,6 +3,7 @@ const SAVED_LISTS_KEY = 'firefly_saved_account_lists';
 let widgetCharts = {};
 let widgetDatasetVisibility = {};
 let widgetsCache = [];
+let dashboardLocked = true;
 
 // Percentage change settings (per-widget, stored in chart_options)
 const PCT_ENABLED_KEY = 'show_pct';
@@ -1075,13 +1076,9 @@ async function renderDashboard() {
         }
     });
 
-    // Initialize SortableJS for drag-and-drop reordering
+    // Initialize SortableJS for drag-and-drop reordering (only if unlocked)
     const grid = document.querySelector('.dashboard-grid');
-    if (grid && typeof Sortable !== 'undefined') {
-        if (grid._sortable) {
-            grid._sortable.destroy();
-        }
-
+    if (grid && !dashboardLocked && typeof Sortable !== 'undefined') {
         grid._sortable = Sortable.create(grid, {
             animation: 150,
             ghostClass: 'sortable-ghost',
@@ -1162,6 +1159,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
         themeToggle.addEventListener('click', toggleTheme);
+    }
+
+    // Dashboard lock/unlock toggle
+    const lockToggle = document.getElementById('dashboard-lock-toggle');
+    if (lockToggle) {
+        lockToggle.addEventListener('click', () => {
+            dashboardLocked = !dashboardLocked;
+            lockToggle.classList.toggle('locked', dashboardLocked);
+            lockToggle.classList.toggle('unlocked', !dashboardLocked);
+            lockToggle.title = dashboardLocked
+                ? 'Unlock dashboard to reorder widgets'
+                : 'Lock dashboard to prevent reordering';
+
+            // Re-initialize SortableJS based on lock state
+            if (grid) {
+                if (dashboardLocked && grid._sortable) {
+                    grid._sortable.destroy();
+                    grid._sortable = null;
+                } else if (!dashboardLocked && typeof Sortable !== 'undefined') {
+                    if (grid._sortable) {
+                        grid._sortable.destroy();
+                    }
+                    grid._sortable = Sortable.create(grid, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        chosenClass: 'sortable-chosen',
+                        dragClass: 'sortable-drag',
+                        onEnd: function(evt) {
+                            const newOrder = [];
+                            grid.querySelectorAll('.widget').forEach(el => {
+                                const id = el.getAttribute('data-widget-id');
+                                if (id) newOrder.push(id);
+                            });
+
+                            if (newOrder.length > 0) {
+                                updateWidgetOrder(newOrder);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+        // Start in locked state
+        lockToggle.classList.add('locked');
     }
 
     renderDashboard();

@@ -398,6 +398,38 @@ button:hover {
     color: white;
 }
 
+/* Dashboard header with lock toggle */
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dashboard-lock-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    transition: background-color var(--transition-speed);
+}
+
+.dashboard-lock-btn:hover {
+    background-color: var(--hover-bg);
+}
+
+.dashboard-lock-btn.locked svg {
+    fill: var(--text-color);
+}
+
+.dashboard-lock-btn.unlocked svg {
+    fill: none;
+    stroke: #5dade2;
+}
+
 /* Dashboard */
 .dashboard-grid {
     display: grid;
