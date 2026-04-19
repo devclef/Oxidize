@@ -47,7 +47,7 @@ async function persistPctSettings(widgetId, showPct, pctMode) {
         const widgets = await getDashboardWidgets();
         const w = widgets.find(w => w.id === widgetId);
         if (!w) return;
-        if (w.chart_options === undefined) w.chart_options = {};
+        w.chart_options = normalizeChartOptions(w.chart_options);
         w.chart_options[PCT_ENABLED_KEY] = showPct;
         w.chart_options[PCT_MODE_KEY] = pctMode;
         w.updated_at = new Date().toISOString();
