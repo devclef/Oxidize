@@ -400,10 +400,18 @@ button:hover {
 /* Dashboard */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(12, 1fr);
     gap: 1.5rem;
     margin-top: 1.5rem;
 }
+
+/* Widget width spans for 12-column grid */
+.dashboard-grid .widget[data-cols="1"]  { grid-column: span 1; }
+.dashboard-grid .widget[data-cols="2"]  { grid-column: span 2; }
+.dashboard-grid .widget[data-cols="3"]  { grid-column: span 3; }
+.dashboard-grid .widget[data-cols="4"]  { grid-column: span 4; }
+.dashboard-grid .widget[data-cols="6"]  { grid-column: span 6; }
+.dashboard-grid .widget[data-cols="12"] { grid-column: span 12; }
 
 .widget {
     background: var(--card-bg);
@@ -446,8 +454,36 @@ button:hover {
 
 .widget-chart {
     position: relative;
-    height: 200px;
     width: 100%;
+}
+
+/* Resize handle for chart height */
+.widget-chart-resize-handle {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    cursor: ns-resize;
+    background: transparent;
+}
+
+.widget-chart-resize-handle::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--text-muted);
+    opacity: 0.4;
+    transition: opacity 0.2s;
+}
+
+.widget-chart-resize-handle:hover::after {
+    opacity: 0.8;
 }
 
 .widget-info {
@@ -769,4 +805,19 @@ button:hover {
         margin-top: 0.5rem;
         flex-wrap: wrap;
     }
+}
+
+/* SortableJS drag styles */
+.dashboard-grid .sortable-ghost {
+    opacity: 0.4;
+    background: var(--card-bg);
+    border: 2px dashed var(--border-color);
+}
+
+.dashboard-grid .sortable-chosen {
+    box-shadow: 0 8px 16px var(--shadow-color);
+}
+
+.dashboard-grid .sortable-drag {
+    opacity: 0.9;
 }
