@@ -4,6 +4,7 @@ let widgetCharts = {};
 let widgetDatasetVisibility = {};
 let widgetsCache = [];
 let dashboardLocked = true;
+let dashboardGrid = null;
 
 // Percentage change settings (per-widget, stored in chart_options)
 const PCT_ENABLED_KEY = 'show_pct';
@@ -1077,9 +1078,9 @@ async function renderDashboard() {
     });
 
     // Initialize SortableJS for drag-and-drop reordering (only if unlocked)
-    const grid = document.querySelector('.dashboard-grid');
-    if (grid && !dashboardLocked && typeof Sortable !== 'undefined') {
-        grid._sortable = Sortable.create(grid, {
+    dashboardGrid = document.querySelector('.dashboard-grid');
+    if (dashboardGrid && !dashboardLocked && typeof Sortable !== 'undefined') {
+        dashboardGrid._sortable = Sortable.create(dashboardGrid, {
             animation: 150,
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
@@ -1173,22 +1174,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 : 'Lock dashboard to prevent reordering';
 
             // Re-initialize SortableJS based on lock state
-            if (grid) {
-                if (dashboardLocked && grid._sortable) {
-                    grid._sortable.destroy();
-                    grid._sortable = null;
+            if (dashboardGrid) {
+                if (dashboardLocked && dashboardGrid._sortable) {
+                    dashboardGrid._sortable.destroy();
+                    dashboardGrid._sortable = null;
                 } else if (!dashboardLocked && typeof Sortable !== 'undefined') {
-                    if (grid._sortable) {
-                        grid._sortable.destroy();
+                    if (dashboardGrid._sortable) {
+                        dashboardGrid._sortable.destroy();
                     }
-                    grid._sortable = Sortable.create(grid, {
+                    dashboardGrid._sortable = Sortable.create(dashboardGrid, {
                         animation: 150,
                         ghostClass: 'sortable-ghost',
                         chosenClass: 'sortable-chosen',
                         dragClass: 'sortable-drag',
                         onEnd: function(evt) {
                             const newOrder = [];
-                            grid.querySelectorAll('.widget').forEach(el => {
+                            dashboardGrid.querySelectorAll('.widget').forEach(el => {
                                 const id = el.getAttribute('data-widget-id');
                                 if (id) newOrder.push(id);
                             });
