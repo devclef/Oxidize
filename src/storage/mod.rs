@@ -122,7 +122,7 @@ impl Storage {
                     let interval: Option<String> = row.get(5)?;
                     let chart_mode: Option<String> = row.get(6)?;
                     let widget_type: Option<String> = row.get(7)?;
-                            let chart_options_json: Option<String> = row.get(8)?;
+                    let chart_options_json: Option<String> = row.get(8)?;
                     let display_order: i32 = row.get(9)?;
                     let width: i32 = row.get(10)?;
                     let chart_height: i32 = row.get(11)?;
@@ -171,7 +171,7 @@ impl Storage {
             .map_err(|e| e.to_string())?;
 
         with_db(|conn| {
-     conn.execute(
+            conn.execute(
                 "INSERT INTO widgets (id, name, accounts, start_date, end_date, interval,
                                       chart_mode, widget_type, chart_options, display_order, width, chart_height, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
@@ -209,29 +209,30 @@ impl Storage {
             .map_err(|e| e.to_string())?;
 
         with_db(|conn| {
-            let rows = conn.execute(
-                "UPDATE widgets SET
+            let rows = conn
+                .execute(
+                    "UPDATE widgets SET
                     name = ?1, accounts = ?2, start_date = ?3, end_date = ?4,
                     interval = ?5, chart_mode = ?6, widget_type = ?7, chart_options = ?8,
                     display_order = ?9, width = ?10, chart_height = ?11, updated_at = ?12
                  WHERE id = ?13",
-                params![
-                    &widget.name,
-                    &accounts_json,
-                    &widget.start_date,
-                    &widget.end_date,
-                    &widget.interval,
-                    &widget.chart_mode,
-                    &widget.widget_type,
-                    &chart_options_json,
-                    &widget.display_order,
-                    &widget.width,
-                    &widget.chart_height,
-                    &now,
-                    &widget.id
-                ],
-            )
-            .map_err(|e| e.to_string())?;
+                    params![
+                        &widget.name,
+                        &accounts_json,
+                        &widget.start_date,
+                        &widget.end_date,
+                        &widget.interval,
+                        &widget.chart_mode,
+                        &widget.widget_type,
+                        &chart_options_json,
+                        &widget.display_order,
+                        &widget.width,
+                        &widget.chart_height,
+                        &now,
+                        &widget.id
+                    ],
+                )
+                .map_err(|e| e.to_string())?;
 
             if rows == 0 {
                 return Err(format!("Widget with id {} not found", widget.id));
