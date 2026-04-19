@@ -27,4 +27,12 @@ pub struct ChartOptions {
     pub fill_area: bool,
     pub tension: f64,
     pub begin_at_zero: bool,
+    #[serde(default)]
+    pub show_pct: bool,
+    #[serde(default = "default_pct_mode")]
+    pub pct_mode: String,
+}
+
+fn default_pct_mode() -> String {
+    "from_previous".to_string()
 }

@@ -60,6 +60,21 @@ async function persistPctSettings(widgetId, showPct, pctMode) {
     }
 }
 
+// Normalize chart_options to include pct defaults for old widgets
+function normalizeChartOptions(opts) {
+    if (!opts) return { show_pct: false, pct_mode: 'from_previous' };
+    return {
+        show_points: opts.show_points ?? false,
+        x_axis_limit: opts.x_axis_limit ?? 6,
+        y_axis_limit: opts.y_axis_limit ?? 4,
+        fill_area: opts.fill_area ?? true,
+        tension: opts.tension ?? 0.1,
+        begin_at_zero: opts.begin_at_zero ?? false,
+        show_pct: opts.show_pct ?? false,
+        pct_mode: opts.pct_mode || 'from_previous'
+    };
+}
+
 // Chart.js plugin for percentage change labels
 const pctLabelPlugin = {
     id: 'percentLabels',
@@ -410,27 +425,16 @@ function renderSplitLegend(widgetId, accountInfo, datasets) {
 }
 
 function getChartOptions(widget) {
-    // Default chart options
-    const defaults = {
-        showPoints: false,
-        xAxisLimit: 6,
-        yAxisLimit: 4,
-        fillArea: true,
-        tension: 0.1,
-        beginAtZero: false,
-        showPct: false,
-        pctMode: 'from_previous'
-    };
-    const opts = widget.chart_options || {};
+    const raw = normalizeChartOptions(widget.chart_options);
     return {
-        showPoints: opts.show_points ?? defaults.showPoints,
-        xAxisLimit: opts.x_axis_limit ?? defaults.xAxisLimit,
-        yAxisLimit: opts.y_axis_limit ?? defaults.yAxisLimit,
-        fillArea: opts.fill_area ?? defaults.fillArea,
-        tension: opts.tension ?? defaults.tension,
-        beginAtZero: opts.begin_at_zero ?? defaults.beginAtZero,
-        showPct: opts[PCT_ENABLED_KEY] ?? defaults.showPct,
-        pctMode: opts[PCT_MODE_KEY] ?? defaults.pctMode
+        showPoints: raw.show_points,
+        xAxisLimit: raw.x_axis_limit,
+        yAxisLimit: raw.y_axis_limit,
+        fillArea: raw.fill_area,
+        tension: raw.tension,
+        beginAtZero: raw.begin_at_zero,
+        showPct: raw.show_pct,
+        pctMode: raw.pct_mode
     };
 }
 
@@ -862,6 +866,13 @@ async function renderDashboard() {
 
     // Fetch all accounts once
     const allAccounts = await fetchAccounts();
+
+    // Normalize chart_options on all widgets (handles old widgets without pct fields)
+    widgets.forEach(widget => {
+        if (widget.chart_options) {
+            widget.chart_options = normalizeChartOptions(widget.chart_options);
+        }
+    });
 
     let html = '<div class="dashboard-grid">';
 
