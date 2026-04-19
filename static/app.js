@@ -2,6 +2,7 @@ let allAccounts = [];
 let balanceChart = null;
 let enableComparison = false;
 const DASHBOARD_WIDGETS_KEY = 'oxidize_dashboard_widgets';
+let selectedTypes = new Set(['all']);
 
 // UUID polyfill for browsers that don't support crypto.randomUUID
 function generateUUID() {
@@ -46,14 +47,13 @@ function updateChartTheme(theme) {
 
 async function fetchAccounts() {
     const app = document.getElementById('app');
-    const typeFilter = document.getElementById('type-filter');
-    const selectedTypes = Array.from(typeFilter.selectedOptions).map(opt => opt.value);
+    const types = Array.from(selectedTypes);
 
     app.innerHTML = '<div class="loading">Loading accounts...</div>';
 
     try {
         // If 'all' is selected or nothing is selected, fetch all configured account types
-        if (selectedTypes.length === 0 || selectedTypes.includes('all')) {
+        if (types.length === 0 || types.includes('all')) {
             allAccounts = [];
             for (const type of CONFIG.accountTypes) {
                 const response = await fetch(`/api/accounts?type=${type}`);
@@ -66,7 +66,7 @@ async function fetchAccounts() {
         } else {
             // Fetch accounts for each selected type and combine results
             allAccounts = [];
-            for (const type of selectedTypes) {
+            for (const type of types) {
                 const response = await fetch(`/api/accounts?type=${type}`);
                 if (!response.ok) {
                     throw new Error(`Error: ${response.status} ${response.statusText}`);
@@ -78,8 +78,12 @@ async function fetchAccounts() {
 
         if (allAccounts.length === 0) {
             app.innerHTML = '<div class="loading">No accounts found for selected filters.</div>';
+            document.getElementById('account-count').textContent = '';
             return;
         }
+
+        // Update account count badge
+        document.getElementById('account-count').textContent = allAccounts.length + ' accounts';
 
         let html = '<div class="account-list">';
         allAccounts.forEach(account => {
@@ -1524,10 +1528,10 @@ function toggleAccountsSection() {
 
     if (content.style.display === 'none') {
         content.style.display = 'block';
-        btn.textContent = '▼ Collapse';
+        btn.textContent = 'Collapse';
     } else {
         content.style.display = 'none';
-        btn.textContent = '▶ Expand';
+        btn.textContent = 'Expand';
     }
 }
 
@@ -1579,8 +1583,8 @@ async function refreshData() {
 // Toggle comparison controls visibility
 function toggleComparisonControls() {
     const enableComparisonCheckbox = document.getElementById('enable-comparison');
-    const comparisonControls = document.querySelector('.comparison-controls');
-    
+    const comparisonControls = document.getElementById('comparison-controls-wrapper');
+
     if (enableComparisonCheckbox && comparisonControls) {
         if (enableComparisonCheckbox.checked) {
             comparisonControls.style.display = 'inline-flex';
@@ -1710,15 +1714,86 @@ document.addEventListener('DOMContentLoaded', () => {
     const deselectAllBtn = document.getElementById('deselect-all-btn');
     const toggleAccountsBtn = document.getElementById('toggle-accounts-btn');
     const app = document.getElementById('app');
-    const typeFilter = document.getElementById('type-filter');
 
-    // Populate type filter with configured account types
-    typeFilter.innerHTML = '<option value="all" selected>All</option>';
+    // Build type filter pills
+    const typeFilterPills = document.getElementById('type-filter-pills');
+    const allPill = document.createElement('button');
+    allPill.type = 'button';
+    allPill.className = 'type-pill active';
+    allPill.textContent = 'All';
+    allPill.dataset.type = 'all';
+    typeFilterPills.appendChild(allPill);
+
     CONFIG.accountTypes.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type;
-        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-        typeFilter.appendChild(option);
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'type-pill';
+        pill.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+        pill.dataset.type = type;
+        typeFilterPills.appendChild(pill);
+    });
+
+    // Pill click handler
+    typeFilterPills.addEventListener('click', (e) => {
+        const pill = e.target.closest('.type-pill');
+        if (!pill) return;
+
+        const type = pill.dataset.type;
+
+        if (type === 'all') {
+            // Select all, deselect others
+            selectedTypes.clear();
+            selectedTypes.add('all');
+            typeFilterPills.querySelectorAll('.type-pill').forEach(p => p.classList.add('active'));
+        } else {
+            // Deselect "all"
+            selectedTypes.delete('all');
+            allPill.classList.remove('active');
+
+            // Toggle this pill
+            pill.classList.toggle('active');
+            if (pill.classList.contains('active')) {
+                selectedTypes.add(type);
+            } else {
+                selectedTypes.delete(type);
+            }
+
+            // If no types selected, select all
+            if (selectedTypes.size === 0) {
+                selectedTypes.add(type);
+                pill.classList.add('active');
+            }
+        }
+    });
+
+    // Account search input
+    const searchInput = document.getElementById('account-search-input');
+    let searchTimeout = null;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.account-card').forEach(card => {
+                const name = card.querySelector('.account-name')?.textContent.toLowerCase() || '';
+                card.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        }, 300);
+    });
+
+    // Advanced options toggle
+    const advancedOptions = document.getElementById('advanced-options');
+    const toggleAdvancedBtn = document.createElement('button');
+    toggleAdvancedBtn.type = 'button';
+    toggleAdvancedBtn.className = 'more-options-toggle';
+    toggleAdvancedBtn.id = 'toggle-advanced-btn';
+    toggleAdvancedBtn.textContent = 'Show advanced options';
+    advancedOptions.prepend(toggleAdvancedBtn);
+
+    let advancedVisible = false;
+    toggleAdvancedBtn.addEventListener('click', () => {
+        advancedVisible = !advancedVisible;
+        advancedOptions.classList.toggle('visible', advancedVisible);
+        toggleAdvancedBtn.textContent = advancedVisible ? 'Hide advanced options' : 'Show advanced options';
     });
 
     // Set default dates (last 30 days)

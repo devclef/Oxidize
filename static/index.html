@@ -6,7 +6,7 @@
     <title>Oxidize - Firefly III Accounts</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
- <body>
+<body>
     <button id="theme-toggle" class="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
         <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="display: none;">
             <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zm5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>
@@ -21,58 +21,81 @@
         <a href="/summary">Summary</a>
     </nav>
     <h1>Firefly III Account Balances</h1>
+
     <div class="controls">
-        <label for="type-filter">Filter by account type:</label>
-        <select id="type-filter" multiple size="6">
-            <option value="all" selected>All</option>
-        </select>
+        <label>Quick actions:</label>
         <button id="fetch-accounts-btn">Fetch Accounts</button>
         <button id="refresh-data-btn" title="Clear cache and fetch fresh data from Firefly III">Refresh Data</button>
     </div>
+
     <div class="account-section">
         <div class="account-section-header">
-            <h3>Accounts</h3>
-            <button id="toggle-accounts-btn" class="toggle-btn" style="display: none;">▼ Collapse</button>
+            <h3>Accounts<span id="account-count" class="account-count-badge"></span></h3>
+            <button id="toggle-accounts-btn" class="toggle-btn" style="display: none;">Collapse</button>
         </div>
+
+        <!-- Account type pills (replaces multi-select) -->
+        <div id="type-filter-pills" class="type-filter-pills"></div>
+
+        <!-- Search input -->
+        <div class="account-search">
+            <input type="text" id="account-search-input" placeholder="Search accounts..." autocomplete="off">
+        </div>
+
         <div id="accounts-content">
             <div class="account-actions">
-                <button id="select-all-btn">Select All</button>
-                <button id="deselect-all-btn">Deselect All</button>
+                <button id="select-all-btn">Select all</button>
+                <button id="deselect-all-btn">Deselect all</button>
             </div>
             <div id="app">
-                <div class="loading">Loading accounts...</div>
+                <div class="loading">Select a type and click "Fetch Accounts" to begin.</div>
             </div>
         </div>
     </div>
 
     <div class="chart-header">
+        <div class="dashboard-header">
             <h2 id="chart-title">Account Balance History</h2>
-            <div class="chart-controls">
-                <label for="start-date">Start:</label>
-                <input type="date" id="start-date">
-                <label for="end-date">End:</label>
-                <input type="date" id="end-date">
-                <label for="interval-select">Interval:</label>
-                <select id="interval-select">
-                    <option value="auto">Auto</option>
-                    <option value="1D">Day</option>
-                    <option value="1W">Week</option>
-                    <option value="1M">Month</option>
-                    <option value="1Y">Year</option>
-                </select>
-                <div class="chart-mode-toggle">
-                    <label>View:</label>
-                    <label class="mode-label">
-                        <input type="radio" name="chart-mode" value="combined" checked>
-                        Combined
-                    </label>
-                    <label class="mode-label">
-                        <input type="radio" name="chart-mode" value="split">
-                        Split
-                    </label>
-                </div>
+            <select id="widget-type-select">
+                <option value="balance">Balance</option>
+                <option value="earned_spent">Earned vs Spent</option>
+                <option value="expenses_by_category">Expenses by Category</option>
+                <option value="net_worth">Net Worth</option>
+            </select>
+        </div>
+
+        <!-- Primary chart controls -->
+        <div class="chart-controls">
+            <label for="start-date">Start:</label>
+            <input type="date" id="start-date">
+            <label for="end-date">End:</label>
+            <input type="date" id="end-date">
+            <label for="interval-select">Interval:</label>
+            <select id="interval-select">
+                <option value="auto">Auto</option>
+                <option value="1D">Day</option>
+                <option value="1W">Week</option>
+                <option value="1M">Month</option>
+                <option value="1Y">Year</option>
+            </select>
+            <div class="chart-mode-toggle">
+                <label class="mode-label">
+                    <input type="radio" name="chart-mode" value="combined" checked>
+                    Combined
+                </label>
+                <label class="mode-label">
+                    <input type="radio" name="chart-mode" value="split">
+                    Split
+                </label>
+            </div>
+            <button id="update-chart-btn">Update Graph</button>
+        </div>
+
+        <!-- Advanced options (collapsible) -->
+        <div id="advanced-options" class="advanced-options">
+            <div class="advanced-row">
                 <div class="pct-toggle">
-                    <label class="mode-label">
+                    <label class="mode-label" style="border: none; background: none;">
                         <input type="checkbox" id="show-pct-toggle">
                         Show % Change
                     </label>
@@ -81,43 +104,38 @@
                         <option value="from_first">From First Point</option>
                     </select>
                 </div>
-                <div class="comparison-toggle">
+                <div class="advanced-group">
                     <label>
                         <input type="checkbox" id="enable-comparison">
                         Compare with previous period
                     </label>
                 </div>
-                <div class="comparison-controls" style="display: none;">
-                    <label for="comparison-start-date">Comparison Start:</label>
-                    <input type="date" id="comparison-start-date">
-                    <label for="comparison-end-date">Comparison End:</label>
-                    <input type="date" id="comparison-end-date">
-                </div>
-                <button id="update-chart-btn">Update Graph</button>
-                <div class="chart-header-actions">
-                    <input type="text" id="widget-name-input" placeholder="Widget name" style="padding: 0.4rem; font-size: 0.9rem; border-radius: 4px; border: 1px solid #ddd;">
-                    <select id="widget-type-select" style="padding: 0.4rem; font-size: 0.9rem; border-radius: 4px; border: 1px solid #ddd;">
-                        <option value="balance">Balance</option>
-                        <option value="earned_spent">Earned vs Spent</option>
-                        <option value="expenses_by_category">Expenses by Category</option>
-                        <option value="net_worth">Net Worth</option>
-                    </select>
-                    <button id="save-graph-btn" class="save-graph-btn">Save as Widget</button>
-                </div>
+            </div>
+            <div id="comparison-controls-wrapper" class="comparison-controls" style="display: none;">
+                <label for="comparison-start-date">Comparison Start:</label>
+                <input type="date" id="comparison-start-date">
+                <label for="comparison-end-date">Comparison End:</label>
+                <input type="date" id="comparison-end-date">
             </div>
         </div>
+
         <div id="chart-error"></div>
         <div class="chart-wrapper">
             <canvas id="balanceChart"></canvas>
         </div>
-        <div id="chart-legend" class="chart-legend"></div>
         <div id="split-legend" class="chart-legend" style="display: none;">
             <div class="legend-container" id="legend-items"></div>
+        </div>
+
+        <!-- Save as widget section -->
+        <div class="widget-save-section">
+            <input type="text" id="widget-name-input" placeholder="Widget name">
+            <button id="save-graph-btn" class="save-graph-btn">Save as Widget</button>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/app.js"></script>
-<script src="/static/theme.js"></script>
+    <script src="/static/theme.js"></script>
 </body>
 </html>
