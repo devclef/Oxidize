@@ -62,27 +62,47 @@ fn default_chart_height() -> i32 {
     300
 }
 
-fn default_show_points() -> bool { false }
-fn default_x_axis_limit() -> i32 { 6 }
-fn default_y_axis_limit() -> i32 { 4 }
-fn default_fill_area() -> bool { true }
-fn default_tension() -> f64 { 0.1 }
-fn default_begin_at_zero() -> bool { false }
-fn default_show_pct() -> bool { false }
+fn default_show_points() -> bool {
+    false
+}
+fn default_x_axis_limit() -> i32 {
+    6
+}
+fn default_y_axis_limit() -> i32 {
+    4
+}
+fn default_fill_area() -> bool {
+    true
+}
+fn default_tension() -> f64 {
+    0.1
+}
+fn default_begin_at_zero() -> bool {
+    false
+}
+fn default_show_pct() -> bool {
+    false
+}
 
 /// Custom deserializer for Option<ChartOptions> that handles null values.
-fn deserialize_chart_options_for_widget<'de, D>(deserializer: D) -> Result<Option<ChartOptions>, D::Error>
+fn deserialize_chart_options_for_widget<'de, D>(
+    deserializer: D,
+) -> Result<Option<ChartOptions>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let value = serde_json::Value::deserialize(deserializer)?;
     match value {
         serde_json::Value::Null => Ok(None),
-        _ => deserialize_chart_options_inner(value).map(Some).map_err(serde::de::Error::custom),
+        _ => deserialize_chart_options_inner(value)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
     }
 }
 
-fn deserialize_chart_options_inner(value: serde_json::Value) -> Result<ChartOptions, serde_json::Error> {
+fn deserialize_chart_options_inner(
+    value: serde_json::Value,
+) -> Result<ChartOptions, serde_json::Error> {
     let mut map = serde_json::Map::new();
     if let serde_json::Value::Object(obj) = value {
         for (key, val) in obj {
@@ -95,7 +115,9 @@ fn deserialize_chart_options_inner(value: serde_json::Value) -> Result<ChartOpti
 }
 
 /// Deserialize ChartOptions from a Deserializer, treating null values as missing fields.
-pub fn deserialize_chart_options_from_deserializer<'de, D>(deserializer: D) -> Result<ChartOptions, D::Error>
+pub fn deserialize_chart_options_from_deserializer<'de, D>(
+    deserializer: D,
+) -> Result<ChartOptions, D::Error>
 where
     D: Deserializer<'de>,
 {

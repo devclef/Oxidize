@@ -14,7 +14,6 @@ async fn main() -> std::io::Result<()> {
     let port = config.port;
 
     info!("Starting server at http://{}:{}", host, port);
-    info!("Account types: {:?}", config.account_types);
     info!("Auto-fetch accounts: {}", config.auto_fetch_accounts);
     info!("Data directory: {}", config.data_dir);
 

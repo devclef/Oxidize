@@ -76,7 +76,7 @@ mod tests {
         // Test Some("all") - this is expected to fail currently because it calls ?type=all
         let accounts_all: Vec<oxidize::models::SimpleAccount> =
             client.get_accounts(Some("all".to_string())).await.unwrap();
-        println!("accounts_all len: {}", accounts_all.len());
+        println!("accounts_all count: {}", accounts_all.len());
         assert_eq!(
             accounts_all.len(),
             1,

@@ -44,16 +44,9 @@ pub async fn get_balance_history(
     let mut end: Option<String> = None;
     let mut period: Option<String> = None;
 
-    log::info!(
-        "Received balance history request with query: {}",
-        query_string
-    );
-
     for (k, v) in params {
-        log::info!("Query param received: {} = {}", k, v);
         match k.as_str() {
             "accounts[]" | "accounts" => {
-                log::info!("Found account ID: {}", v);
                 account_ids.push(v);
             }
             "start" => start = Some(v),
@@ -62,7 +55,6 @@ pub async fn get_balance_history(
             _ => {
                 // Check for URL-encoded variants of accounts[]
                 if k == "accounts%5B%5D" {
-                    log::info!("Found URL-encoded account ID: {}", v);
                     account_ids.push(v);
                 }
             }
@@ -117,34 +109,22 @@ pub async fn get_earned_spent(
     let mut period: Option<String> = None;
     let mut account_ids: Vec<String> = Vec::new();
 
-    log::info!("Received earned/spent request with query: {}", query_string);
-
     for (k, v) in params {
         match k.as_str() {
             "start" => start = Some(v),
             "end" => end = Some(v),
             "period" => period = Some(v),
             "accounts[]" | "accounts" => {
-                log::info!("Found account ID: {}", v);
                 account_ids.push(v);
             }
             _ => {
                 // Check for URL-encoded variants of accounts[]
                 if k == "accounts%5B%5D" {
-                    log::info!("Found URL-encoded account ID: {}", v);
                     account_ids.push(v);
                 }
             }
         }
     }
-
-    log::info!(
-        "Parsed earned/spent params: start={:?}, end={:?}, period={:?}, accounts={}",
-        start,
-        end,
-        period,
-        account_ids.len()
-    );
 
     match client
         .get_earned_spent(start, end, period, Some(account_ids))
@@ -174,13 +154,11 @@ pub async fn get_expenses_by_category(
             "start" => start = Some(v),
             "end" => end = Some(v),
             "accounts[]" | "accounts" => {
-                log::info!("Found account ID: {}", v);
                 account_ids.push(v);
             }
             _ => {
                 // Check for URL-encoded variants of accounts[]
                 if k == "accounts%5B%5D" {
-                    log::info!("Found URL-encoded account ID: {}", v);
                     account_ids.push(v);
                 }
             }
