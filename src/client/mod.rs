@@ -125,12 +125,19 @@ impl FireflyClient {
                 .format("%Y-%m-%d")
                 .to_string()
         });
-        let period_val = period.unwrap_or_else(|| "1D".to_string());
+        let period_val = period.clone().unwrap_or_else(|| "1D".to_string());
+
+        // Firefly III doesn't support quarterly periods, so map 1Q -> 1M and aggregate locally
+        let api_period = if period_val == "1Q" {
+            "1M"
+        } else {
+            &period_val
+        };
 
         let mut query_params = vec![
             ("start".to_string(), start.clone()),
             ("end".to_string(), end.clone()),
-            ("period".to_string(), period_val.clone()),
+            ("period".to_string(), api_period.to_string()),
         ];
 
         if let Some(ref ids) = account_ids {
@@ -166,6 +173,12 @@ impl FireflyClient {
         }
 
         let chart_line: ChartLine = response.json().await.map_err(|e| e.to_string())?;
+
+        let chart_line = if period_val == "1Q" {
+            aggregate_monthly_to_quarterly(chart_line)
+        } else {
+            chart_line
+        };
 
         if let Ok(json) = serde_json::to_string(&chart_line) {
             self.cache.set_balance_history(
@@ -1005,4 +1018,37 @@ impl FireflyClient {
             })
             .unwrap_or((None, None))
     }
+}
+
+/// Aggregate monthly chart data into quarterly buckets.
+/// Expects entries with monthly date keys like "2025-01-01T00:00:00+00:00".
+fn aggregate_monthly_to_quarterly(mut chart_line: ChartLine) -> ChartLine {
+    for dataset in chart_line.iter_mut() {
+        if let Some(entries_obj) = dataset.entries.as_object() {
+            let mut quarterly: std::collections::HashMap<String, f64> =
+                std::collections::HashMap::new();
+
+            for (key, value) in entries_obj {
+                if let Some(date_part) = key.split('T').next() {
+                    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+                        let quarter = ((date.month() - 1) / 3) + 1;
+                        let q_key = format!("{}-Q{}", date.year(), quarter);
+                        *quarterly.entry(q_key).or_default() += value.as_f64().unwrap_or(0.0);
+                    } else {
+                        quarterly.insert(key.clone(), value.as_f64().unwrap_or(0.0));
+                    }
+                }
+            }
+
+            dataset.entries = serde_json::Value::Object(
+                quarterly
+                    .into_iter()
+                    .filter_map(|(k, v)| {
+                        serde_json::Number::from_f64(v).map(|n| (k, serde_json::Value::Number(n)))
+                    })
+                    .collect(),
+            );
+        }
+    }
+    chart_line
 }
