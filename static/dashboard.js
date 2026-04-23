@@ -6,6 +6,19 @@ let widgetsCache = [];
 let dashboardLocked = true;
 let dashboardGrid = null;
 
+// Parse a chart label that may be a date string or quarterly format like "2025-Q1"
+function parseChartLabel(label) {
+    if (typeof label !== 'string') return new Date(label);
+    const qMatch = label.match(/^(\d{4})-Q(\d)$/);
+    if (qMatch) {
+        const year = parseInt(qMatch[1], 10);
+        const quarter = parseInt(qMatch[2], 10);
+        const month = (quarter - 1) * 3 + 1;
+        return new Date(year, month - 1, 1);
+    }
+    return new Date(label);
+}
+
 // Percentage change settings (per-widget, stored in chart_options)
 const PCT_ENABLED_KEY = 'show_pct';
 const PCT_MODE_KEY = 'pct_mode';
@@ -529,7 +542,7 @@ async function renderEarnedSpentChart(ctx, widget, labels, history, containerId)
                         autoSkip: true,
                         callback: function(value) {
                             const label = this.getLabelForValue(value);
-                            const date = new Date(label);
+                            const date = parseChartLabel(label);
                             return date.toLocaleDateString();
                         }
                     }
