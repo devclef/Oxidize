@@ -4,6 +4,19 @@ let enableComparison = false;
 const DASHBOARD_WIDGETS_KEY = 'oxidize_dashboard_widgets';
 let selectedTypes = new Set(['all']);
 
+// Parse a chart label that may be a date string or quarterly format like "2025-Q1"
+function parseChartLabel(label) {
+    if (typeof label !== 'string') return new Date(label);
+    const qMatch = label.match(/^(\d{4})-Q(\d)$/);
+    if (qMatch) {
+        const year = parseInt(qMatch[1], 10);
+        const quarter = parseInt(qMatch[2], 10);
+        const month = (quarter - 1) * 3 + 1;
+        return new Date(year, month - 1, 1);
+    }
+    return new Date(label);
+}
+
 // UUID polyfill for browsers that don't support crypto.randomUUID
 function generateUUID() {
     if (crypto.randomUUID) {
@@ -608,7 +621,7 @@ function renderEarnedSpentChart(ctx, history) {
                         autoSkip: true,
                         callback: function(value) {
                             const label = this.getLabelForValue(value);
-                            const date = new Date(label);
+                            const date = parseChartLabel(label);
                             return date.toLocaleDateString();
                         }
                     }
@@ -754,8 +767,8 @@ function renderNetWorthChart(ctx, history) {
 
     // Sort by date
     const sortedIndices = labels.map((_, i) => i).sort((a, b) => {
-        const dateA = new Date(labels[a]);
-        const dateB = new Date(labels[b]);
+        const dateA = parseChartLabel(labels[a]);
+        const dateB = parseChartLabel(labels[b]);
         return dateA - dateB;
     });
 
@@ -804,7 +817,7 @@ function renderNetWorthChart(ctx, history) {
                         maxRotation: 45,
                         minRotation: 45,
                         callback: function(value) {
-                            const date = new Date(value);
+                            const date = parseChartLabel(value);
                             return date.toLocaleDateString();
                         }
                     }
