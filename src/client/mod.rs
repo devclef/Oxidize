@@ -1022,8 +1022,25 @@ impl FireflyClient {
 
 /// Aggregate monthly chart data into quarterly buckets.
 /// For balance data, takes the last value of each quarter (end-of-quarter balance).
+/// Handles both object entries {"date": value} and array entries [{key, value}].
 fn aggregate_monthly_to_quarterly(mut chart_line: ChartLine) -> ChartLine {
     for dataset in chart_line.iter_mut() {
+        // Normalize entries to object format first
+        if let Some(entries_arr) = dataset.entries.as_array() {
+            let mut obj = serde_json::Map::new();
+            for item in entries_arr {
+                if let (Some(key), Some(value)) = (
+                    item.get("key")
+                        .or_else(|| item.get("date"))
+                        .and_then(|k| k.as_str()),
+                    item.get("value"),
+                ) {
+                    obj.insert(key.to_string(), value.clone());
+                }
+            }
+            dataset.entries = serde_json::Value::Object(obj);
+        }
+
         if let Some(entries_obj) = dataset.entries.as_object() {
             // Parse all entries into (date, quarter_key, value) tuples and sort by date
             let mut sorted: Vec<(chrono::NaiveDate, String, f64)> = entries_obj
@@ -1033,7 +1050,10 @@ fn aggregate_monthly_to_quarterly(mut chart_line: ChartLine) -> ChartLine {
                     let date = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d").ok()?;
                     let quarter = ((date.month() - 1) / 3) + 1;
                     let q_key = format!("{}-Q{}", date.year(), quarter);
-                    value.as_f64().map(|v| (date, q_key, v))
+                    let v = value
+                        .as_f64()
+                        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))?;
+                    Some((date, q_key, v))
                 })
                 .collect();
             sorted.sort_by_key(|(date, _, _)| *date);
