@@ -2,6 +2,7 @@ use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use crate::models::group::Group;
 use crate::models::widget::ChartOptions;
 use crate::models::Widget;
 
@@ -52,6 +53,19 @@ fn init_db(conn: &Connection) {
         [],
     )
     .expect("Failed to create widgets table");
+
+    // Create groups table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            account_ids TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )",
+        [],
+    )
+    .expect("Failed to create groups table");
 
     // Migration: Add widget_type column if it doesn't exist (for existing databases)
     let _ = conn.execute(
@@ -250,6 +264,105 @@ impl Storage {
 
             if rows == 0 {
                 return Err(format!("Widget with id {} not found", id));
+            }
+
+            Ok(())
+        })
+    }
+
+    // Group CRUD operations
+
+    pub fn get_all_groups() -> Result<Vec<Group>, String> {
+        with_db(|conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, name, account_ids, created_at, updated_at
+                     FROM groups ORDER BY created_at DESC",
+                )
+                .map_err(|e| e.to_string())?;
+
+            let groups = stmt
+                .query_map([], |row| {
+                    let id: String = row.get(0)?;
+                    let name: String = row.get(1)?;
+                    let account_ids_json: String = row.get(2)?;
+                    let created_at: Option<String> = row.get(3)?;
+                    let updated_at: Option<String> = row.get(4)?;
+
+                    let account_ids: Vec<String> =
+                        serde_json::from_str(&account_ids_json).unwrap_or_default();
+
+                    Ok(Group {
+                        id,
+                        name,
+                        account_ids,
+                        created_at,
+                        updated_at,
+                    })
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r: Result<Group, _>| r.ok())
+                .collect();
+
+            Ok(groups)
+        })
+    }
+
+    pub fn create_group(group: &Group) -> Result<(), String> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let account_ids_json = serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
+
+        with_db(|conn| {
+            conn.execute(
+                "INSERT INTO groups (id, name, account_ids, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    &group.id,
+                    &group.name,
+                    &account_ids_json,
+                    &now,
+                    &now
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+
+            Ok(())
+        })
+    }
+
+    pub fn update_group(group: &Group) -> Result<(), String> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let account_ids_json = serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
+
+        with_db(|conn| {
+            let rows = conn
+                .execute(
+                    "UPDATE groups SET name = ?1, account_ids = ?2, updated_at = ?3 WHERE id = ?4",
+                    params![
+                        &group.name,
+                        &account_ids_json,
+                        &now,
+                        &group.id
+                    ],
+                )
+                .map_err(|e| e.to_string())?;
+
+            if rows == 0 {
+                return Err(format!("Group with id {} not found", group.id));
+            }
+
+            Ok(())
+        })
+    }
+
+    pub fn delete_group(id: &str) -> Result<(), String> {
+        with_db(|conn| {
+            let rows = conn
+                .execute("DELETE FROM groups WHERE id = ?1", params![id])
+                .map_err(|e| e.to_string())?;
+
+            if rows == 0 {
+                return Err(format!("Group with id {} not found", id));
             }
 
             Ok(())
