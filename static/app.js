@@ -913,6 +913,82 @@ function renderNetWorthChart(ctx, history) {
     });
 }
 
+// Aggregate account data into groups for split mode rendering
+function aggregateGroupData(history, groups, allAccountsList) {
+    // Build a map of account name -> { data, balance }
+    const nameDataMap = new Map();
+    history.forEach(ds => {
+        let flowData = [];
+        if (Array.isArray(ds.entries)) {
+            flowData = ds.entries.map(e => parseFloat(e.value || 0));
+        } else {
+            flowData = Object.values(ds.entries || {}).map(v => parseFloat(v?.value || v || 0));
+        }
+        nameDataMap.set(ds.label, { data: flowData, balance: '0' });
+    });
+
+    // Also build account name -> balance map from allAccountsList
+    const accountBalanceMap = new Map();
+    allAccountsList.forEach(a => {
+        accountBalanceMap.set(a.name, a.balance);
+    });
+
+    // Find checked groups
+    const checkedGroups = groups.filter(g => g._checked);
+
+    // Track which account names are consumed by groups
+    const groupMemberNames = new Set();
+    checkedGroups.forEach(g => {
+        g.account_ids.forEach(accId => {
+            const acc = allAccountsList.find(a => a.id === accId);
+            if (acc) groupMemberNames.add(acc.name);
+        });
+    });
+
+    // Build display items
+    const displayItems = [];
+
+    // Add group items first
+    checkedGroups.forEach(group => {
+        let summedData = null;
+        let totalBalance = 0;
+
+        group.account_ids.forEach(accId => {
+            const acc = allAccountsList.find(a => a.id === accId);
+            if (!acc) return;
+
+            const ds = nameDataMap.get(acc.name);
+            if (!ds) return;
+
+            if (!summedData) {
+                summedData = ds.data.map(v => v);
+            } else {
+                ds.data.forEach((v, i) => {
+                    if (summedData[i] !== undefined) summedData[i] += v;
+                });
+            }
+            totalBalance += parseFloat(acc.balance || 0);
+        });
+
+        if (summedData) {
+            displayItems.push({
+                type: 'group',
+                label: group.name,
+                data: summedData,
+                absoluteData: summedData,
+                balance: totalBalance.toString()
+            });
+        }
+    });
+
+    // Add individual (non-group) accounts
+    // uniqueAccountInfo already contains all selected accounts;
+    // we need to filter out those consumed by groups
+    // This is handled by the caller passing the right uniqueAccountInfo
+
+    return displayItems;
+}
+
 function renderChart(history, widgetType = 'balance') {
     const ctx = document.getElementById('balanceChart').getContext('2d');
     const chartMode = document.querySelector('input[name="chart-mode"]:checked')?.value || 'combined';
@@ -1093,13 +1169,23 @@ function renderChart(history, widgetType = 'balance') {
         }
     });
 
-    // Generate colors for accounts
-    accountColors = generateColors(uniqueAccountInfo.length);
+    // Generate colors for accounts (accounts + groups)
+    const checkedGroups = groups.filter(g => g._checked);
+    const groupMemberNames = new Set();
+    checkedGroups.forEach(g => {
+        g.account_ids.forEach(accId => {
+            const acc = allAccounts.find(a => a.id === accId);
+            if (acc) groupMemberNames.add(acc.name);
+        });
+    });
+    const individualAccounts = uniqueAccountInfo.filter(info => !groupMemberNames.has(info.name));
+    const totalDisplayItems = checkedGroups.length + individualAccounts.length;
+    accountColors = generateColors(totalDisplayItems);
 
     // Initialize visibility tracking by index - all visible by default
-    uniqueAccountInfo.forEach((info, index) => {
-        datasetVisibility[index] = true;
-    });
+    for (let i = 0; i < totalDisplayItems; i++) {
+        datasetVisibility[i] = true;
+    }
 
     if (chartMode === 'split') {
         console.log('=== SPLIT MODE DEBUG ===');
@@ -1146,12 +1232,13 @@ function renderChart(history, widgetType = 'balance') {
                 balance: '0'
             }));
         } else {
-            // Create individual datasets for each account
-            // The backend now returns per-account data with account name as the label
-            currentDatasets = uniqueAccountInfo.map((info, index) => {
-                // Find the dataset for this account by matching the account name
-                // Use normalization to handle potential (In)/(Out) suffixes
-                const dataset = filteredHistory.find(ds => {
+            // Build display items: groups first, then individual (non-group) accounts
+            currentDatasets = [];
+            let colorIndex = 0;
+
+            // Helper: find dataset for an account name
+            const findDatasetForName = (name) => {
+                return filteredHistory.find(ds => {
                     const normalizedDsLabel = ds.label
                         .replace(/ - In$/, '')
                         .replace(/ - Out$/, '')
@@ -1161,32 +1248,15 @@ function renderChart(history, widgetType = 'balance') {
                         .replace(/ Expense$/, '')
                         .replace(/ Earned$/, '')
                         .replace(/ Spent$/, '');
-                    return normalizedDsLabel === info.name || ds.label === info.name;
+                    return normalizedDsLabel === name || ds.label === name;
                 });
+            };
 
-                if (!dataset) {
-                    console.warn(`No data found for account: ${info.name}`);
-                    // No data for this account, return empty dataset
-                    return {
-                        label: info.name,
-                        data: new Array(labels.length).fill(null),
-                        borderColor: accountColors[index].border,
-                        backgroundColor: accountColors[index].background,
-                        borderWidth: 2,
-                        tension: 0.1,
-                        fill: false
-                    };
-                }
-
-                console.log(`Found dataset for: ${info.name}`);
-
-                // Get flow data from the dataset
+            // Helper: process a dataset into a Chart.js dataset
+            const processDataset = (dataset, name, anchorBalance, idx) => {
                 let datasetFlowData = [];
                 if (Array.isArray(dataset.entries)) {
-                    datasetFlowData = dataset.entries.map(e => {
-                        const val = e.value || e.amount || e.balance || 0;
-                        return parseFloat(val);
-                    });
+                    datasetFlowData = dataset.entries.map(e => parseFloat(e.value || e.amount || e.balance || 0));
                 } else {
                     datasetFlowData = Object.values(dataset.entries).map(v => {
                         if (typeof v === 'object' && v !== null) {
@@ -1195,47 +1265,28 @@ function renderChart(history, widgetType = 'balance') {
                         return parseFloat(v);
                     });
                 }
-                console.log(`Dataset "${dataset.label}" flowData:`, datasetFlowData);
 
-                // Determine if the data is absolute balance or flow.
-                // Firefly III's chart/account/overview endpoint returns balance snapshots (absolute),
-                // except for "earned" and "spent" which are flow data.
                 const lastValue = datasetFlowData[datasetFlowData.length - 1];
-                const anchorBalance = parseFloat(info.balance);
-
-                // "earned" and "spent" are always flow data
-                const isFlowLabel = info.name === 'earned' || info.name === 'spent';
 
                 let isAbsolute;
-                if (isFlowLabel) {
-                    isAbsolute = false;
+                if (anchorBalance === 0 && lastValue === 0) {
+                    isAbsolute = true;
+                } else if (anchorBalance === 0) {
+                    const allSameSign = datasetFlowData.every(v => v >= 0) || datasetFlowData.every(v => v <= 0);
+                    isAbsolute = !allSameSign;
                 } else {
-                    // For account datasets, assume absolute balance unless clear evidence otherwise.
-                    // Check if data looks like flow: all values are small and same-sign (typical for transactions)
                     const allPositive = datasetFlowData.every(v => v >= 0);
                     const allNegative = datasetFlowData.every(v => v <= 0);
                     const maxAbsValue = Math.max(...datasetFlowData.map(Math.abs));
-
-                    // If all values are same-sign and relatively small, might be flow data
-                    // But only if the last value is also very different from anchor
-                    const relativeDiff = anchorBalance !== 0 ? Math.abs(lastValue - anchorBalance) / Math.abs(anchorBalance) : Infinity;
-
-                    // Heuristic: treat as flow only if:
-                    // 1. All values are same sign (typical for earned/spent type flows)
-                    // 2. Values are small relative to anchor (transactions vs balances)
-                    // 3. Last value is significantly different from anchor
+                    const relativeDiff = Math.abs(lastValue - anchorBalance) / Math.abs(anchorBalance);
                     const looksLikeFlow = (allPositive || allNegative) && maxAbsValue < Math.abs(anchorBalance) * 0.1 && relativeDiff > 0.5;
-
                     isAbsolute = !looksLikeFlow;
                 }
-
-                console.log(`Account ${info.name}: lastValue=${lastValue}, anchorBalance=${anchorBalance}, isAbsolute=${isAbsolute}`);
 
                 let absoluteData;
                 if (isAbsolute) {
                     absoluteData = datasetFlowData;
                 } else {
-                    // Calculate absolute running balance backwards from the anchor balance
                     absoluteData = new Array(datasetFlowData.length);
                     let runningBalance = anchorBalance;
                     for (let i = datasetFlowData.length - 1; i >= 0; i--) {
@@ -1243,18 +1294,124 @@ function renderChart(history, widgetType = 'balance') {
                         runningBalance -= datasetFlowData[i];
                     }
                 }
-                console.log(`Account ${info.name}: absoluteData=`, absoluteData.slice(0, 5), '...');
 
                 return {
-                    label: info.name,
+                    label: name,
                     data: absoluteData,
                     absoluteData: absoluteData,
-                    borderColor: accountColors[index].border,
-                    backgroundColor: accountColors[index].background,
+                    borderColor: accountColors[idx].border,
+                    backgroundColor: accountColors[idx].background,
                     borderWidth: 2,
                     tension: 0.1,
                     fill: false
                 };
+            };
+
+            // Add group datasets (aggregated)
+            checkedGroups.forEach(group => {
+                let summedData = null;
+                let totalBalance = 0;
+                const memberDatasets = [];
+
+                group.account_ids.forEach(accId => {
+                    const acc = allAccounts.find(a => a.id === accId);
+                    if (!acc) return;
+                    const dataset = findDatasetForName(acc.name);
+                    if (!dataset) return;
+                    memberDatasets.push({ dataset, balance: acc.balance, name: acc.name });
+                    totalBalance += parseFloat(acc.balance || 0);
+                });
+
+                if (memberDatasets.length === 0) return;
+
+                // Aggregate data points
+                memberDatasets.forEach(({ dataset, balance, name }) => {
+                    let flowData = [];
+                    if (Array.isArray(dataset.entries)) {
+                        flowData = dataset.entries.map(e => parseFloat(e.value || e.amount || e.balance || 0));
+                    } else {
+                        flowData = Object.values(dataset.entries).map(v => {
+                            if (typeof v === 'object' && v !== null) {
+                                return parseFloat(v.value || v.amount || v.balance || 0);
+                            }
+                            return parseFloat(v);
+                        });
+                    }
+
+                    if (!summedData) {
+                        summedData = flowData.map(v => v);
+                    } else {
+                        flowData.forEach((v, i) => {
+                            if (summedData[i] !== undefined) summedData[i] += v;
+                        });
+                    }
+                });
+
+                // Determine isAbsolute for the group (use last member's logic as proxy)
+                const lastMember = memberDatasets[memberDatasets.length - 1];
+                const lastValue = summedData ? summedData[summedData.length - 1] : 0;
+                let isAbsolute;
+                if (totalBalance === 0 && lastValue === 0) {
+                    isAbsolute = true;
+                } else if (totalBalance === 0) {
+                    const allSameSign = summedData.every(v => v >= 0) || summedData.every(v => v <= 0);
+                    isAbsolute = !allSameSign;
+                } else {
+                    const allPositive = summedData.every(v => v >= 0);
+                    const allNegative = summedData.every(v => v <= 0);
+                    const maxAbsValue = Math.max(...summedData.map(Math.abs));
+                    const relativeDiff = Math.abs(lastValue - totalBalance) / Math.abs(totalBalance);
+                    const looksLikeFlow = (allPositive || allNegative) && maxAbsValue < Math.abs(totalBalance) * 0.1 && relativeDiff > 0.5;
+                    isAbsolute = !looksLikeFlow;
+                }
+
+                let absoluteData;
+                if (isAbsolute) {
+                    absoluteData = summedData;
+                } else {
+                    absoluteData = new Array(summedData.length);
+                    let runningBalance = totalBalance;
+                    for (let i = summedData.length - 1; i >= 0; i--) {
+                        absoluteData[i] = runningBalance;
+                        runningBalance -= summedData[i];
+                    }
+                }
+
+                currentDatasets.push({
+                    label: group.name,
+                    data: absoluteData,
+                    absoluteData: absoluteData,
+                    borderColor: accountColors[colorIndex].border,
+                    backgroundColor: accountColors[colorIndex].background,
+                    borderWidth: 2,
+                    tension: 0.1,
+                    fill: false
+                });
+                colorIndex++;
+            });
+
+            // Add individual (non-group) account datasets
+            individualAccounts.forEach((info, index) => {
+                const dataset = findDatasetForName(info.name);
+
+                if (!dataset) {
+                    console.warn(`No data found for account: ${info.name}`);
+                    currentDatasets.push({
+                        label: info.name,
+                        data: new Array(labels.length).fill(null),
+                        borderColor: accountColors[colorIndex].border,
+                        backgroundColor: accountColors[colorIndex].background,
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: false
+                    });
+                    colorIndex++;
+                    return;
+                }
+
+                const processed = processDataset(dataset, info.name, parseFloat(info.balance), colorIndex);
+                currentDatasets.push(processed);
+                colorIndex++;
             });
         }
 
@@ -1323,7 +1480,15 @@ function renderChart(history, widgetType = 'balance') {
         });
 
         // Render the legend after chart is created
-        renderSplitLegend(uniqueAccountInfo, currentDatasets);
+        // Build legend info matching currentDatasets (groups + individuals)
+        const legendInfo = [];
+        checkedGroups.forEach(g => {
+            legendInfo.push({ name: g.name, balance: '0' });
+        });
+        individualAccounts.forEach(a => {
+            legendInfo.push({ name: a.name, balance: a.balance });
+        });
+        renderSplitLegend(legendInfo, currentDatasets);
     } else {
         // Combined mode - aggregate all datasets
         // Calculate total anchor balance from unique accounts
