@@ -310,19 +310,14 @@ impl Storage {
 
     pub fn create_group(group: &Group) -> Result<(), String> {
         let now = chrono::Utc::now().to_rfc3339();
-        let account_ids_json = serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
+        let account_ids_json =
+            serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
 
         with_db(|conn| {
             conn.execute(
                 "INSERT INTO groups (id, name, account_ids, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    &group.id,
-                    &group.name,
-                    &account_ids_json,
-                    &now,
-                    &now
-                ],
+                params![&group.id, &group.name, &account_ids_json, &now, &now],
             )
             .map_err(|e| e.to_string())?;
 
@@ -332,18 +327,14 @@ impl Storage {
 
     pub fn update_group(group: &Group) -> Result<(), String> {
         let now = chrono::Utc::now().to_rfc3339();
-        let account_ids_json = serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
+        let account_ids_json =
+            serde_json::to_string(&group.account_ids).map_err(|e| e.to_string())?;
 
         with_db(|conn| {
             let rows = conn
                 .execute(
                     "UPDATE groups SET name = ?1, account_ids = ?2, updated_at = ?3 WHERE id = ?4",
-                    params![
-                        &group.name,
-                        &account_ids_json,
-                        &now,
-                        &group.id
-                    ],
+                    params![&group.name, &account_ids_json, &now, &group.id],
                 )
                 .map_err(|e| e.to_string())?;
 
