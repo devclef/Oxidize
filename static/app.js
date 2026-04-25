@@ -1595,13 +1595,14 @@ function renderGroups() {
     const groupsSection = document.getElementById('groups-section');
     const groupsList = document.getElementById('groups-list');
 
-    if (groups.length === 0) {
-        groupsSection.style.display = 'none';
-        return;
-    }
-
+    // Always show the section so the "Create Group" button is visible
     groupsSection.style.display = 'block';
     groupsList.innerHTML = '';
+
+    if (groups.length === 0) {
+        groupsList.innerHTML = '<p style="opacity: 0.7; padding: 0.5rem;">No groups yet. Click "+ Create Group" to get started.</p>';
+        return;
+    }
 
     groups.forEach(group => {
         const item = document.createElement('div');
