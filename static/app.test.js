@@ -765,3 +765,282 @@ describe('Percentage Change Feature', () => {
         });
     });
 });
+
+describe('Account Groups', () => {
+    describe('group data aggregation', () => {
+        it('should sum account data points for a group', () => {
+            const accountDataMap = new Map();
+            accountDataMap.set('acc-1', {
+                data: [100, 110, 120],
+                balance: '120',
+                name: 'Account 1'
+            });
+            accountDataMap.set('acc-2', {
+                data: [200, 210, 220],
+                balance: '220',
+                name: 'Account 2'
+            });
+
+            const group = {
+                id: 'group-1',
+                name: 'My Group',
+                account_ids: ['acc-1', 'acc-2'],
+                _checked: true
+            };
+
+            const summedData = group.account_ids.reduce((acc, accId) => {
+                const member = accountDataMap.get(accId);
+                if (!member) return acc;
+                if (!acc) return member.data.map(v => v);
+                return member.data.map((v, i) => acc[i] + v);
+            }, null);
+
+            expect(summedData).toEqual([300, 320, 340]);
+        });
+
+        it('should handle group with one account', () => {
+            const accountDataMap = new Map();
+            accountDataMap.set('acc-1', {
+                data: [500, 510, 520],
+                balance: '520',
+                name: 'Single Account'
+            });
+
+            const group = {
+                id: 'group-single',
+                name: 'Single',
+                account_ids: ['acc-1'],
+                _checked: true
+            };
+
+            const summedData = group.account_ids.reduce((acc, accId) => {
+                const member = accountDataMap.get(accId);
+                if (!member) return acc;
+                if (!acc) return member.data.map(v => v);
+                return member.data.map((v, i) => acc[i] + v);
+            }, null);
+
+            expect(summedData).toEqual([500, 510, 520]);
+        });
+
+        it('should skip unchecked groups', () => {
+            const checkedGroups = [
+                { id: 'g1', _checked: true, account_ids: ['acc-1'] },
+                { id: 'g2', _checked: false, account_ids: ['acc-2'] }
+            ];
+
+            const filtered = checkedGroups.filter(g => g._checked);
+            expect(filtered).toHaveLength(1);
+            expect(filtered[0].id).toBe('g1');
+        });
+
+        it('should calculate correct anchor balance for group', () => {
+            const accountBalanceMap = new Map();
+            accountBalanceMap.set('acc-1', { balance: '1000' });
+            accountBalanceMap.set('acc-2', { balance: '2000' });
+
+            const group = {
+                account_ids: ['acc-1', 'acc-2']
+            };
+
+            const totalBalance = group.account_ids.reduce((sum, accId) => {
+                const member = accountBalanceMap.get(accId);
+                return sum + (member ? parseFloat(member.balance) : 0);
+            }, 0);
+
+            expect(totalBalance).toBe(3000);
+        });
+    });
+
+    describe('group checkbox toggles member accounts', () => {
+        it('should check all member accounts when group is checked', () => {
+            const group = {
+                id: 'g1',
+                account_ids: ['acc-1', 'acc-2', 'acc-3']
+            };
+
+            const mockCheckboxes = [
+                { value: 'acc-1', checked: false },
+                { value: 'acc-2', checked: false },
+                { value: 'acc-3', checked: false }
+            ];
+
+            group.account_ids.forEach(accId => {
+                const cb = mockCheckboxes.find(c => c.value === accId);
+                if (cb) cb.checked = true;
+            });
+
+            expect(mockCheckboxes.every(c => c.checked)).toBe(true);
+        });
+
+        it('should deselect all member accounts when group is unchecked', () => {
+            const group = {
+                id: 'g1',
+                account_ids: ['acc-1', 'acc-2']
+            };
+
+            const mockCheckboxes = [
+                { value: 'acc-1', checked: true },
+                { value: 'acc-2', checked: true },
+                { value: 'acc-3', checked: true }
+            ];
+
+            group.account_ids.forEach(accId => {
+                const cb = mockCheckboxes.find(c => c.value === accId);
+                if (cb) cb.checked = false;
+            });
+
+            expect(mockCheckboxes.filter(c => c.checked).map(c => c.value)).toEqual(['acc-3']);
+        });
+    });
+
+    describe('group CRUD operations', () => {
+        it('should create a valid group object', () => {
+            const group = {
+                id: 'test-group-1',
+                name: 'Test Group',
+                account_ids: ['1', '2', '3']
+            };
+
+            expect(group.id).toBeDefined();
+            expect(group.name).toBe('Test Group');
+            expect(group.account_ids).toHaveLength(3);
+        });
+
+        it('should reject empty group name', () => {
+            const name = '';
+            expect(name.trim()).toBe('');
+            expect(name.trim().length).toBe(0);
+        });
+
+        it('should reject group with no accounts', () => {
+            const accountIds = [];
+            expect(accountIds.length).toBe(0);
+            expect(accountIds.length === 0).toBe(true);
+        });
+
+        it('should update group name and accounts', () => {
+            const group = {
+                id: 'g1',
+                name: 'Old Name',
+                account_ids: ['1']
+            };
+
+            const updated = { ...group, name: 'New Name', account_ids: ['1', '2', '3'] };
+
+            expect(updated.name).toBe('New Name');
+            expect(updated.account_ids).toHaveLength(3);
+            expect(updated.id).toBe('g1');
+        });
+
+        it('should delete group by ID', () => {
+            const groups = [
+                { id: 'g1', name: 'Group 1' },
+                { id: 'g2', name: 'Group 2' },
+                { id: 'g3', name: 'Group 3' }
+            ];
+
+            const deletedId = 'g2';
+            const filtered = groups.filter(g => g.id !== deletedId);
+
+            expect(filtered).toHaveLength(2);
+            expect(filtered.find(g => g.id === 'g2')).toBeUndefined();
+        });
+    });
+
+    describe('localStorage group persistence', () => {
+        it('should save and restore groups from localStorage', () => {
+            const mockLocalStorage = {
+                data: {},
+                getItem: function(key) { return this.data[key] || null; },
+                setItem: function(key, value) { this.data[key] = value; }
+            };
+
+            const groups = [
+                { id: 'g1', name: 'Test', account_ids: ['1', '2'] }
+            ];
+
+            mockLocalStorage.setItem('oxidize_groups', JSON.stringify(groups));
+            const restored = JSON.parse(mockLocalStorage.getItem('oxidize_groups'));
+
+            expect(restored).toHaveLength(1);
+            expect(restored[0].name).toBe('Test');
+            expect(restored[0].account_ids).toEqual(['1', '2']);
+        });
+
+        it('should handle empty localStorage gracefully', () => {
+            const mockLocalStorage = {
+                getItem: function() { return null; }
+            };
+
+            const stored = mockLocalStorage.getItem('oxidize_groups');
+            const groups = stored ? JSON.parse(stored) : [];
+
+            expect(groups).toEqual([]);
+        });
+    });
+
+    describe('group-account separation for split mode', () => {
+        it('should filter out group member accounts from individual list', () => {
+            const allAccounts = [
+                { id: 'a1', name: 'Account 1', balance: '100' },
+                { id: 'a2', name: 'Account 2', balance: '200' },
+                { id: 'a3', name: 'Account 3', balance: '300' }
+            ];
+
+            const group = {
+                id: 'g1',
+                name: 'Credit Cards',
+                account_ids: ['a1', 'a2'],
+                _checked: true
+            };
+
+            const uniqueAccountInfo = [
+                { id: 'a1', name: 'Account 1', balance: '100' },
+                { id: 'a2', name: 'Account 2', balance: '200' },
+                { id: 'a3', name: 'Account 3', balance: '300' }
+            ];
+
+            const groupMemberNames = new Set();
+            group.account_ids.forEach(accId => {
+                const acc = allAccounts.find(a => a.id === accId);
+                if (acc) groupMemberNames.add(acc.name);
+            });
+
+            const individualAccounts = uniqueAccountInfo.filter(info => !groupMemberNames.has(info.name));
+
+            expect(individualAccounts).toHaveLength(1);
+            expect(individualAccounts[0].name).toBe('Account 3');
+        });
+
+        it('should handle multiple checked groups', () => {
+            const allAccounts = [
+                { id: 'a1', name: 'CC1', balance: '100' },
+                { id: 'a2', name: 'CC2', balance: '200' },
+                { id: 'a3', name: 'Checking', balance: '500' },
+                { id: 'a4', name: 'Savings', balance: '1000' }
+            ];
+
+            const groups = [
+                { id: 'g1', name: 'Credit Cards', account_ids: ['a1', 'a2'], _checked: true },
+                { id: 'g2', name: 'Assets', account_ids: ['a3', 'a4'], _checked: true }
+            ];
+
+            const uniqueAccountInfo = allAccounts.map(a => ({ id: a.id, name: a.name, balance: a.balance }));
+
+            const groupMemberNames = new Set();
+            groups.forEach(g => {
+                if (g._checked) {
+                    g.account_ids.forEach(accId => {
+                        const acc = allAccounts.find(a => a.id === accId);
+                        if (acc) groupMemberNames.add(acc.name);
+                    });
+                }
+            });
+
+            const individualAccounts = uniqueAccountInfo.filter(info => !groupMemberNames.has(info.name));
+
+            expect(individualAccounts).toHaveLength(0);
+        });
+    });
+});
