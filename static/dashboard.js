@@ -266,7 +266,8 @@ async function updateWidgetDateRange(widgetId) {
 
         // Re-render the chart
         const allAccounts = await fetchAccounts();
-        await renderWidgetChart(widget, widgetId, allAccounts);
+        const allGroups = await fetchDashboardGroups();
+        await renderWidgetChart(widget, widgetId, allAccounts, allGroups);
     } catch (e) {
         console.error('Failed to update widget:', e);
         alert(`Failed to update widget: ${e.message}`);
@@ -285,6 +286,16 @@ async function fetchAccounts() {
     }
 
     return allAccounts;
+}
+
+async function fetchDashboardGroups() {
+    try {
+        const response = await fetch('/api/groups');
+        if (!response.ok) return [];
+        return await response.json();
+    } catch {
+        return [];
+    }
 }
 
 async function fetchChartData(accountIds, startDate, endDate, interval) {
@@ -582,7 +593,7 @@ function extractChartData(entries, length) {
     }
 }
 
-async function renderWidgetChart(widget, containerId, allAccounts) {
+async function renderWidgetChart(widget, containerId, allAccounts, allGroups = []) {
     const ctx = document.getElementById(containerId).getContext('2d');
 
     try {
@@ -746,36 +757,106 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
         } else {
             // Split mode - multiple lines
             const filteredHistory = history.filter(ds => ds.label !== 'earned' && ds.label !== 'spent');
-            const colors = generateColors(widget.accounts.length);
 
-            const accountInfo = widget.accounts.map(id => {
-                const account = allAccounts.find(a => a.id === id);
-                return {
-                    id: id,
-                    name: account ? account.name : 'Unknown',
-                    balance: account ? account.balance : '0'
-                };
-            });
+            // Build display items: groups first (from widget.group_ids), then individual accounts
+            const groupIds = widget.group_ids || [];
+            const widgetGroups = groupIds.map(gid => allGroups.find(g => g.id === gid)).filter(Boolean);
+            const widgetGroupAccountIds = new Set();
+            widgetGroups.forEach(g => g.account_ids.forEach(id => widgetGroupAccountIds.add(id)));
 
-            const datasets = accountInfo.map((info, index) => {
-                const dataset = filteredHistory.find(ds => {
+            const individualAccounts = widget.accounts
+                .filter(id => !widgetGroupAccountIds.has(id))
+                .map(id => {
+                    const account = allAccounts.find(a => a.id === id);
+                    return account ? { id, name: account.name, balance: account.balance } : null;
+                })
+                .filter(Boolean);
+
+            const totalDisplayItems = widgetGroups.length + individualAccounts.length;
+            const colors = generateColors(totalDisplayItems);
+
+            // Helper: find dataset for an account name
+            const findDatasetForName = (name) => {
+                return filteredHistory.find(ds => {
                     const normalizedDsLabel = ds.label.replace(/ - In$/, '').replace(/ - Out$/, '').replace(/ \(In\)$/, '').replace(/ \(Out\)$/, '');
-                    return normalizedDsLabel === info.name || ds.label === info.name;
+                    return normalizedDsLabel === name || ds.label === name;
+                });
+            };
+
+            const datasets = [];
+            const legendInfo = [];
+
+            // Add group datasets (aggregated)
+            widgetGroups.forEach((group, idx) => {
+                let summedData = null;
+                let totalBalance = 0;
+
+                group.account_ids.forEach(accId => {
+                    const acc = allAccounts.find(a => a.id === accId);
+                    if (!acc) return;
+                    const dataset = findDatasetForName(acc.name);
+                    if (!dataset) return;
+
+                    let flowData = [];
+                    if (Array.isArray(dataset.entries)) {
+                        flowData = dataset.entries.map(e => parseFloat(e.value || 0));
+                    } else {
+                        flowData = Object.values(dataset.entries).map(v => {
+                            if (typeof v === 'object' && v !== null) return parseFloat(v.value || 0);
+                            return parseFloat(v);
+                        });
+                    }
+
+                    if (!summedData) {
+                        summedData = flowData.map(v => v);
+                    } else {
+                        flowData.forEach((v, i) => {
+                            if (summedData[i] !== undefined) summedData[i] += v;
+                        });
+                    }
+                    totalBalance += parseFloat(acc.balance || 0);
                 });
 
-                const opts = getChartOptions(widget);
+                if (!summedData) return;
+
+                const lastValue = summedData[summedData.length - 1];
+
+                // The Firefly III chart API returns absolute balance data, not flow data
+                const absoluteData = summedData;
+
+                console.log(`[Split mode] Group "${group.name}": Using aggregated data. lastValue=${lastValue}, totalBalance=${totalBalance}`);
+
+                datasets.push({
+                    label: group.name,
+                    data: absoluteData,
+                    absoluteData: absoluteData,
+                    borderColor: colors[idx],
+                    borderWidth: 2,
+                    tension: getChartOptions(widget).tension,
+                    fill: getChartOptions(widget).fillArea,
+                    pointRadius: getChartOptions(widget).showPoints ? 4 : 0
+                });
+                legendInfo.push({ name: group.name, balance: totalBalance.toString() });
+            });
+
+            // Add individual account datasets
+            individualAccounts.forEach((info, idx) => {
+                const dataset = findDatasetForName(info.name);
+                const colorIdx = widgetGroups.length + idx;
 
                 if (!dataset) {
-                    return {
+                    datasets.push({
                         label: info.name,
                         data: new Array(labels.length).fill(null),
                         absoluteData: new Array(labels.length).fill(null),
-                        borderColor: colors[index],
+                        borderColor: colors[colorIdx],
                         borderWidth: 2,
-                        tension: opts.tension,
-                        fill: opts.fillArea,
-                        pointRadius: opts.showPoints ? 4 : 0
-                    };
+                        tension: getChartOptions(widget).tension,
+                        fill: getChartOptions(widget).fillArea,
+                        pointRadius: getChartOptions(widget).showPoints ? 4 : 0
+                    });
+                    legendInfo.push({ name: info.name, balance: info.balance });
+                    return;
                 }
 
                 let flowData = [];
@@ -783,32 +864,27 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
                     flowData = dataset.entries.map(e => parseFloat(e.value || 0));
                 } else {
                     flowData = Object.values(dataset.entries).map(v => {
-                        if (typeof v === 'object' && v !== null) {
-                            return parseFloat(v.value || 0);
-                        }
+                        if (typeof v === 'object' && v !== null) return parseFloat(v.value || 0);
                         return parseFloat(v);
                     });
                 }
 
-                const lastValue = flowData[flowData.length - 1];
                 const anchorBalance = parseFloat(info.balance);
-
-                // The Firefly III chart API returns absolute balance data, not flow data
-                // So we can use the flowData directly without any conversion
                 const absoluteData = flowData;
 
-                console.log(`[Split mode] Account "${info.name}": Using flowData directly as absolute. lastValue=${lastValue}, anchorBalance=${anchorBalance}`);
+                console.log(`[Split mode] Account "${info.name}": Using flowData directly as absolute. lastValue=${flowData[flowData.length - 1]}, anchorBalance=${anchorBalance}`);
 
-                return {
+                datasets.push({
                     label: info.name,
                     data: absoluteData,
                     absoluteData: absoluteData,
-                    borderColor: colors[index],
+                    borderColor: colors[colorIdx],
                     borderWidth: 2,
-                    tension: opts.tension,
-                    fill: opts.fillArea,
-                    pointRadius: opts.showPoints ? 4 : 0
-                };
+                    tension: getChartOptions(widget).tension,
+                    fill: getChartOptions(widget).fillArea,
+                    pointRadius: getChartOptions(widget).showPoints ? 4 : 0
+                });
+                legendInfo.push({ name: info.name, balance: info.balance });
             });
 
             if (widgetCharts[widget.id]) {
@@ -875,7 +951,7 @@ async function renderWidgetChart(widget, containerId, allAccounts) {
             widgetCharts[widget.id].__pctOpts = { enabled: opts2.showPct, mode: opts2.pctMode };
 
             // Render the legend after chart is created
-            renderSplitLegend(widget.id, accountInfo, datasets);
+            renderSplitLegend(widget.id, legendInfo, datasets);
         }
     } catch (error) {
         console.error('Error rendering widget chart:', error);
@@ -902,8 +978,9 @@ async function renderDashboard() {
 
     widgetsCache = widgets;
 
-    // Fetch all accounts once
+    // Fetch all accounts and groups
     const allAccounts = await fetchAccounts();
+    const allGroups = await fetchDashboardGroups();
 
     // Normalize chart_options on all widgets (handles old widgets without pct fields)
     widgets.forEach(widget => {
@@ -919,15 +996,25 @@ async function renderDashboard() {
     widgets.forEach(widget => {
         const widgetType = widget.widget_type || 'balance';
 
-        const accountNames = widget.accounts.map(id => {
-            const account = allAccounts.find(a => a.id === id);
-            return account ? account.name : 'Unknown';
-        }).join(', ');
+        // Build account/group display info
+        const groupIds = widget.group_ids || [];
+        const widgetGroups = groupIds.map(gid => allGroups.find(g => g.id === gid)).filter(Boolean);
+        const widgetGroupAccountIds = new Set();
+        widgetGroups.forEach(g => g.account_ids.forEach(id => widgetGroupAccountIds.add(id)));
 
-        const accountTags = widget.accounts.map(id => {
-            const account = allAccounts.find(a => a.id === id);
-            return account ? `<span class="widget-account-tag">${account.name}</span>` : '';
-        }).join('');
+        const individualAccounts = widget.accounts
+            .map(id => allAccounts.find(a => a.id === id))
+            .filter(Boolean);
+
+        const accountNames = [
+            ...widgetGroups.map(g => g.name),
+            ...individualAccounts.map(a => a.name)
+        ].join(', ');
+
+        const accountTags = [
+            ...widgetGroups.map(g => `<span class="widget-account-tag">${g.name}</span>`),
+            ...individualAccounts.map(a => `<span class="widget-account-tag">${a.name}</span>`)
+        ].join('');
 
         const startDate = widget.start_date || '';
         const endDate = widget.end_date || '';
@@ -1031,7 +1118,7 @@ async function renderDashboard() {
 
     // Render charts for each widget
     for (const widget of widgets) {
-        await renderWidgetChart(widget, widget.id, allAccounts);
+        await renderWidgetChart(widget, widget.id, allAccounts, allGroups);
     }
 
     // Wire up percentage change controls for each widget

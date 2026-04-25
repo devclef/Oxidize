@@ -1940,10 +1940,22 @@ async function saveGraphAsWidget() {
     const comparisonEndDate = enableComparison ? document.getElementById('comparison-end-date').value : null;
     const chartMode = document.querySelector('input[name="chart-mode"]:checked')?.value || 'combined';
 
+    // Identify which selected accounts belong to checked groups
+    const checkedGroups = groups.filter(g => g._checked);
+    const groupMemberIds = new Set();
+    checkedGroups.forEach(g => {
+        g.account_ids.forEach(id => groupMemberIds.add(id));
+    });
+
+    // Separate group member IDs from individual account IDs
+    const groupIds = checkedGroups.map(g => g.id);
+    const individualAccountIds = selectedIds.filter(id => !groupMemberIds.has(id));
+
     const widget = {
         id: generateUUID(),
         name: widgetName,
-        accounts: selectedIds,
+        accounts: individualAccountIds,
+        group_ids: groupIds,
         start_date: startDate || null,
         end_date: endDate || null,
         interval: interval || null,

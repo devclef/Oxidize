@@ -46,6 +46,29 @@ fn test_widget_deserialize_with_new_fields() {
     assert_eq!(widget.display_order, 5);
     assert_eq!(widget.width, 6);
     assert_eq!(widget.chart_height, 400);
+    assert_eq!(widget.group_ids, Vec::<String>::new());
+}
+
+#[test]
+fn test_widget_deserialize_with_group_ids() {
+    let json = r#"{
+        "id": "test-4",
+        "name": "Group Widget",
+        "accounts": ["acc-3"],
+        "group_ids": ["grp-1", "grp-2"],
+        "start_date": null,
+        "end_date": null,
+        "interval": null,
+        "chart_mode": null,
+        "widget_type": null,
+        "chart_options": null,
+        "created_at": null,
+        "updated_at": null
+    }"#;
+
+    let widget: Widget = serde_json::from_str(json).unwrap();
+    assert_eq!(widget.group_ids, vec!["grp-1".to_string(), "grp-2".to_string()]);
+    assert_eq!(widget.accounts, vec!["acc-3".to_string()]);
 }
 
 #[test]
@@ -54,6 +77,7 @@ fn test_widget_serialization_includes_new_fields() {
         id: "test-3".to_string(),
         name: "Test".to_string(),
         accounts: vec!["acc-1".to_string()],
+        group_ids: vec![],
         start_date: None,
         end_date: None,
         interval: None,

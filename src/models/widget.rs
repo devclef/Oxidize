@@ -5,6 +5,8 @@ pub struct Widget {
     pub id: String,
     pub name: String,
     pub accounts: Vec<String>,
+    #[serde(default)]
+    pub group_ids: Vec<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
     pub interval: Option<String>,
