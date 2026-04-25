@@ -4,6 +4,9 @@ let enableComparison = false;
 const DASHBOARD_WIDGETS_KEY = 'oxidize_dashboard_widgets';
 let selectedTypes = new Set(['all']);
 let chartErrorEl = null;
+let groups = [];
+let editingGroupId = null;
+const GROUPS_STORAGE_KEY = 'oxidize_groups';
 
 // Parse a chart label that may be a date string or quarterly format like "2025-Q1"
 function parseChartLabel(label) {
@@ -29,6 +32,71 @@ function generateUUID() {
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+}
+
+function loadGroups() {
+    try {
+        const stored = localStorage.getItem(GROUPS_STORAGE_KEY);
+        if (stored) {
+            groups = JSON.parse(stored);
+        }
+    } catch {
+        groups = [];
+    }
+}
+
+function saveGroups() {
+    try {
+        localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+    } catch {
+        // ignore
+    }
+}
+
+async function fetchGroups() {
+    try {
+        const response = await fetch('/api/groups');
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (e) {
+        console.error('Failed to fetch groups:', e);
+        return [];
+    }
+}
+
+async function saveGroupToBackend(group) {
+    if (group.id) {
+        const response = await fetch(`/api/groups/${group.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(group)
+        });
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || 'Failed to update group');
+        }
+        return response.json();
+    } else {
+        group.id = group.id || generateUUID();
+        const response = await fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(group)
+        });
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || 'Failed to save group');
+        }
+        return response.json();
+    }
+}
+
+async function deleteGroupFromBackend(id) {
+    const response = await fetch(`/api/groups/${id}`, { method: 'DELETE' });
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to delete group');
+    }
 }
 
 // Get config from server or use defaults
@@ -1358,6 +1426,195 @@ function renderChart(history, widgetType = 'balance') {
     }
 }
 
+function renderGroups() {
+    const groupsSection = document.getElementById('groups-section');
+    const groupsList = document.getElementById('groups-list');
+
+    if (groups.length === 0) {
+        groupsSection.style.display = 'none';
+        return;
+    }
+
+    groupsSection.style.display = 'block';
+    groupsList.innerHTML = '';
+
+    groups.forEach(group => {
+        const item = document.createElement('div');
+        item.className = 'group-item';
+        item.dataset.groupId = group.id;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'group-select';
+        checkbox.value = group.id;
+        checkbox.checked = group._checked || false;
+
+        checkbox.addEventListener('change', () => {
+            group._checked = checkbox.checked;
+            if (checkbox.checked) {
+                group.account_ids.forEach(accId => {
+                    const cb = document.querySelector(`.account-select[value="${accId}"]`);
+                    if (cb) cb.checked = true;
+                });
+            } else {
+                group.account_ids.forEach(accId => {
+                    const cb = document.querySelector(`.account-select[value="${accId}"]`);
+                    if (cb) cb.checked = false;
+                });
+            }
+            fetchChartData();
+        });
+
+        const info = document.createElement('div');
+        info.className = 'group-info';
+
+        const name = document.createElement('span');
+        name.className = 'group-name';
+        name.textContent = group.name;
+
+        const count = document.createElement('span');
+        count.className = 'group-account-count';
+        count.textContent = ` (${group.account_ids.length} accounts)`;
+
+        info.appendChild(name);
+        info.appendChild(count);
+
+        const actions = document.createElement('div');
+        actions.className = 'group-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openGroupModal(group.id));
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', async () => {
+            if (confirm(`Delete group "${group.name}"?`)) {
+                try {
+                    await deleteGroupFromBackend(group.id);
+                    groups = groups.filter(g => g.id !== group.id);
+                    saveGroups();
+                    renderGroups();
+                } catch (e) {
+                    alert(`Failed to delete group: ${e.message}`);
+                }
+            }
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        item.appendChild(checkbox);
+        item.appendChild(info);
+        item.appendChild(actions);
+        groupsList.appendChild(item);
+    });
+}
+
+function openGroupModal(groupId = null) {
+    editingGroupId = groupId;
+    const modal = document.getElementById('group-modal');
+    const title = document.getElementById('group-modal-title');
+    const nameInput = document.getElementById('group-name-input');
+    const accountsList = document.getElementById('group-accounts-list');
+
+    nameInput.value = '';
+    accountsList.innerHTML = '';
+
+    if (groupId) {
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return;
+        title.textContent = 'Edit Group';
+        nameInput.value = group.name;
+
+        allAccounts.forEach(account => {
+            const item = document.createElement('div');
+            item.className = 'group-account-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = account.id;
+            checkbox.checked = group.account_ids.includes(account.id);
+
+            const label = document.createElement('span');
+            label.textContent = `${account.name} (${account.balance})`;
+
+            item.appendChild(checkbox);
+            item.appendChild(label);
+            accountsList.appendChild(item);
+        });
+    } else {
+        title.textContent = 'Create Group';
+
+        if (allAccounts.length === 0) {
+            accountsList.innerHTML = '<p style="opacity: 0.7;">Fetch accounts first to create groups.</p>';
+        } else {
+            allAccounts.forEach(account => {
+                const item = document.createElement('div');
+                item.className = 'group-account-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = account.id;
+
+                const label = document.createElement('span');
+                label.textContent = `${account.name} (${account.balance})`;
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                accountsList.appendChild(item);
+            });
+        }
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeGroupModal() {
+    document.getElementById('group-modal').style.display = 'none';
+    editingGroupId = null;
+}
+
+async function handleGroupSave() {
+    const nameInput = document.getElementById('group-name-input');
+    const accountsList = document.getElementById('group-accounts-list');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        alert('Please enter a group name');
+        return;
+    }
+
+    const selectedCheckboxes = accountsList.querySelectorAll('input[type="checkbox"]:checked');
+    const accountIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+    if (accountIds.length === 0) {
+        alert('Please select at least one account');
+        return;
+    }
+
+    const group = {
+        id: editingGroupId || null,
+        name,
+        account_ids: accountIds
+    };
+
+    try {
+        const saved = await saveGroupToBackend(group);
+        const idx = groups.findIndex(g => g.id === saved.id);
+        if (idx >= 0) {
+            groups[idx] = saved;
+        } else {
+            groups.push(saved);
+        }
+        saveGroups();
+        renderGroups();
+        closeGroupModal();
+    } catch (e) {
+        alert(`Failed to save group: ${e.message}`);
+    }
+}
+
 function renderSplitLegend(accountInfo, datasets) {
     const legendContainer = document.getElementById('split-legend');
     const legendItems = document.getElementById('legend-items');
@@ -1829,6 +2086,28 @@ document.addEventListener('DOMContentLoaded', () => {
     selectAllBtn.addEventListener('click', selectAllAccounts);
     deselectAllBtn.addEventListener('click', deselectAllAccounts);
     toggleAccountsBtn.addEventListener('click', toggleAccountsSection);
+
+    // Load and render groups
+    loadGroups();
+    fetchGroups().then(backendGroups => {
+        if (backendGroups.length > 0) {
+            groups = backendGroups.map(bg => {
+                const existing = groups.find(g => g.id === bg.id);
+                return existing ? { ...bg, _checked: existing._checked } : bg;
+            });
+        }
+        renderGroups();
+    });
+
+    document.getElementById('create-group-btn').addEventListener('click', () => openGroupModal());
+
+    document.getElementById('group-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'group-modal' || e.target.classList.contains('modal-close')) {
+            closeGroupModal();
+        }
+    });
+    document.getElementById('group-modal-cancel').addEventListener('click', closeGroupModal);
+    document.getElementById('group-modal-save').addEventListener('click', handleGroupSave);
 
     // Handle chart mode change
     document.querySelectorAll('input[name="chart-mode"]').forEach(radio => {
