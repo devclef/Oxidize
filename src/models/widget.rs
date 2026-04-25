@@ -11,6 +11,7 @@ pub struct Widget {
     pub chart_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub widget_type: Option<String>, // "balance" (default) or "earned_spent"
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(deserialize_with = "deserialize_chart_options_for_widget")]
     pub chart_options: Option<ChartOptions>,
