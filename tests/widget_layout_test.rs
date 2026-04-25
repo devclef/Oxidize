@@ -67,7 +67,10 @@ fn test_widget_deserialize_with_group_ids() {
     }"#;
 
     let widget: Widget = serde_json::from_str(json).unwrap();
-    assert_eq!(widget.group_ids, vec!["grp-1".to_string(), "grp-2".to_string()]);
+    assert_eq!(
+        widget.group_ids,
+        vec!["grp-1".to_string(), "grp-2".to_string()]
+    );
     assert_eq!(widget.accounts, vec!["acc-3".to_string()]);
 }
 
