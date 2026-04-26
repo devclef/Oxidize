@@ -30,5 +30,7 @@ pub async fn manifest() -> HttpResponse {
     let content = std::fs::read_to_string("./static/manifest.json").unwrap_or_default();
     HttpResponse::Ok()
         .content_type("application/manifest+json")
+        .insert_header(("Access-Control-Allow-Origin", "*"))
+        .insert_header(("Cache-Control", "public, max-age=3600"))
         .body(content)
 }
