@@ -619,9 +619,15 @@ async function renderWidgetChart(widget, containerId, allAccounts, allGroups = [
             }
             history = await response.json();
         } else {
-            // For balance widgets, fetch with specific accounts
+            // For balance widgets, fetch with all relevant accounts (individual + group members)
+            const groupIds = widget.group_ids || [];
+            const widgetGroups = groupIds.map(gid => allGroups.find(g => g.id === gid)).filter(Boolean);
+            const groupAccountIds = new Set();
+            widgetGroups.forEach(g => g.account_ids.forEach(id => groupAccountIds.add(id)));
+            const allWidgetAccountIds = [...new Set([...widget.accounts, ...groupAccountIds])];
+
             history = await fetchChartData(
-                widget.accounts,
+                allWidgetAccountIds,
                 widget.start_date,
                 widget.end_date,
                 widget.interval
