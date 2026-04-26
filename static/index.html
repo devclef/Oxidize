@@ -127,6 +127,17 @@
                 <label for="comparison-end-date">Comparison End:</label>
                 <input type="date" id="comparison-end-date">
             </div>
+            <div class="advanced-row forecast-row">
+                <div class="forecast-group">
+                    <label>
+                        <input type="checkbox" id="enable-forecast">
+                        Forecast trend
+                    </label>
+                    <label for="forecast-days">Days:
+                        <input type="number" id="forecast-days" value="30" min="1" max="365" style="width:60px">
+                    </label>
+                </div>
+            </div>
         </div>
 
         <div id="chart-error"></div>

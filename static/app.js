@@ -995,6 +995,73 @@ function aggregateGroupData(history, groups, allAccountsList) {
     return displayItems;
 }
 
+// Linear regression: y = slope * x + intercept
+function linearRegression(points) {
+    const n = points.length;
+    if (n < 2) return { slope: 0, intercept: 0 };
+
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (const p of points) {
+        sumX += p.x;
+        sumY += p.y;
+        sumXY += p.x * p.y;
+        sumX2 += p.x * p.x;
+    }
+
+    const denominator = n * sumX2 - sumX * sumX;
+    if (denominator === 0) return { slope: 0, intercept: sumY / n };
+
+    const slope = (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+    return { slope, intercept };
+}
+
+// Compute forecast data points using linear regression on recent balance history
+function computeForecast(absoluteData, labels, forecastDays) {
+    if (absoluteData.length < 2) return null;
+
+    // Use up to last 30 data points for regression
+    const regressionWindow = Math.min(absoluteData.length, 30);
+    const windowStart = absoluteData.length - regressionWindow;
+
+    const points = [];
+    for (let i = windowStart; i < absoluteData.length; i++) {
+        if (absoluteData[i] !== null && absoluteData[i] !== undefined && !isNaN(absoluteData[i])) {
+            points.push({ x: i, y: absoluteData[i] });
+        }
+    }
+
+    if (points.length < 2) return null;
+
+    const { slope, intercept } = linearRegression(points);
+
+    // Determine the period from the last two labels
+    const lastDate = parseChartLabel(labels[labels.length - 1]);
+    let periodDays = 1;
+    if (labels.length >= 2) {
+        const prevDate = parseChartLabel(labels[labels.length - 2]);
+        const diffMs = lastDate - prevDate;
+        periodDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    // Generate forecast points
+    const forecastValues = [];
+    const forecastLabels = [];
+
+    for (let i = 1; i <= forecastDays; i++) {
+        const futureIndex = absoluteData.length - 1 + i;
+        const predictedY = slope * futureIndex + intercept;
+        const forecastValue = isNaN(predictedY) ? null : predictedY;
+        forecastValues.push(forecastValue);
+
+        const futureDate = new Date(lastDate);
+        futureDate.setDate(futureDate.getDate() + periodDays * i);
+        forecastLabels.push(futureDate.toISOString().split('T')[0]);
+    }
+
+    return { values: forecastValues, labels: forecastLabels };
+}
+
 function renderChart(history, widgetType = 'balance') {
     const ctx = document.getElementById('balanceChart').getContext('2d');
     const chartMode = document.querySelector('input[name="chart-mode"]:checked')?.value || 'combined';
@@ -1426,6 +1493,34 @@ function renderChart(history, widgetType = 'balance') {
             dataset.hidden = !datasetVisibility[index];
         });
 
+        // Forecast for split mode: extend each visible dataset with its own forecast data
+        const enableForecastEl = document.getElementById('enable-forecast');
+        const forecastDaysEl = document.getElementById('forecast-days');
+        const showForecast = enableForecastEl && enableForecastEl.checked;
+        const forecastDays = forecastDaysEl ? parseInt(forecastDaysEl.value, 10) || 30 : 30;
+
+        let splitChartLabels = labels;
+
+        if (showForecast) {
+            // Compute shared forecast labels from the first visible dataset
+            const firstVisible = currentDatasets.find(d => !d.hidden);
+            if (firstVisible) {
+                const result = computeForecast(firstVisible.data, labels, forecastDays);
+                if (result) {
+                    splitChartLabels = [...labels, ...result.labels];
+                }
+            }
+
+            // Extend each visible dataset with its own forecast
+            currentDatasets.forEach((dataset) => {
+                if (dataset.hidden) return;
+                const result = computeForecast(dataset.data, labels, forecastDays);
+                if (result) {
+                    dataset.data = [...dataset.data, ...result.values];
+                }
+            });
+        }
+
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const chartTextColor = isDark ? '#eaeaea' : '#333';
         const chartGridColor = isDark ? '#444' : '#ddd';
@@ -1433,7 +1528,7 @@ function renderChart(history, widgetType = 'balance') {
         balanceChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels: splitChartLabels,
                 datasets: currentDatasets
             },
             options: {
@@ -1541,14 +1636,36 @@ function renderChart(history, widgetType = 'balance') {
             }
         }
 
+        // Forecast
+        const enableForecastEl = document.getElementById('enable-forecast');
+        const forecastDaysEl = document.getElementById('forecast-days');
+        const showForecast = enableForecastEl && enableForecastEl.checked;
+        const forecastDays = forecastDaysEl ? parseInt(forecastDaysEl.value, 10) || 30 : 30;
+
+        let forecastLabels = [];
+        let forecastData = [];
+        let chartLabels = labels;
+        let chartAbsoluteData = absoluteData;
+
+        if (showForecast) {
+            const result = computeForecast(absoluteData, labels, forecastDays);
+            if (result) {
+                chartAbsoluteData = [...absoluteData, ...result.values];
+                chartLabels = [...labels, ...result.labels];
+                forecastData = result.values;
+                forecastLabels = result.labels;
+            }
+        }
+
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const chartTextColor = isDark ? '#eaeaea' : '#333';
         const chartGridColor = isDark ? '#444' : '#ddd';
         const color = isDark ? '#5dade2' : '#3498db';
+        const forecastColor = isDark ? '#a0a0a0' : '#888';
 
         const chartDatasets = [{
             label: 'Total Balance',
-            data: absoluteData,
+            data: chartAbsoluteData,
             absoluteData: absoluteData,
             borderColor: color,
             backgroundColor: color + '20',
@@ -1557,10 +1674,25 @@ function renderChart(history, widgetType = 'balance') {
             fill: true
         }];
 
+        if (showForecast && forecastData.length > 0) {
+            chartDatasets.push({
+                label: 'Forecast',
+                data: forecastData,
+                borderColor: forecastColor,
+                backgroundColor: forecastColor + '10',
+                borderWidth: 2,
+                borderDash: [6, 4],
+                tension: 0.1,
+                fill: false,
+                pointRadius: 0,
+                order: 1
+            });
+        }
+
         balanceChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels: chartLabels,
                 datasets: chartDatasets
             },
             options: {
@@ -2369,5 +2501,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         // Restore saved mode
         pctModeSelect.value = pctMode;
+    }
+
+    // Forecast toggle
+    const enableForecastEl = document.getElementById('enable-forecast');
+    const forecastDaysEl = document.getElementById('forecast-days');
+    const FORECAST_KEY = 'oxidize_forecast_enabled';
+    const FORECAST_DAYS_KEY = 'oxidize_forecast_days';
+
+    let forecastEnabled = localStorage.getItem(FORECAST_KEY) === 'true';
+    let forecastDays = parseInt(localStorage.getItem(FORECAST_DAYS_KEY), 10) || 30;
+
+    if (enableForecastEl) {
+        enableForecastEl.checked = forecastEnabled;
+        enableForecastEl.addEventListener('change', () => {
+            forecastEnabled = enableForecastEl.checked;
+            localStorage.setItem(FORECAST_KEY, forecastEnabled);
+            if (balanceChart) {
+                balanceChart.update();
+            }
+        });
+    }
+
+    if (forecastDaysEl) {
+        forecastDaysEl.value = forecastDays;
+        forecastDaysEl.addEventListener('change', () => {
+            forecastDays = parseInt(forecastDaysEl.value, 10) || 30;
+            localStorage.setItem(FORECAST_DAYS_KEY, forecastDays);
+            if (balanceChart) {
+                balanceChart.update();
+            }
+        });
     }
 });
