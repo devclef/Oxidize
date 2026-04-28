@@ -56,6 +56,60 @@ function formatPct(value) {
     return sign + value.toFixed(1) + '%';
 }
 
+// Linear regression helper for forecast
+function linearRegression(points) {
+    const n = points.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (const p of points) {
+        sumX += p.x; sumY += p.y; sumXY += p.x * p.y; sumXX += p.x * p.x;
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    return { slope, intercept };
+}
+
+// Compute forecast data points using linear regression on recent balance history
+function computeForecast(absoluteData, labels, forecastDays) {
+    if (absoluteData.length < 2) return null;
+
+    const regressionWindow = Math.min(absoluteData.length, 30);
+    const windowStart = absoluteData.length - regressionWindow;
+
+    const points = [];
+    for (let i = windowStart; i < absoluteData.length; i++) {
+        if (absoluteData[i] !== null && absoluteData[i] !== undefined && !isNaN(absoluteData[i])) {
+            points.push({ x: i, y: absoluteData[i] });
+        }
+    }
+
+    if (points.length < 2) return null;
+
+    const { slope, intercept } = linearRegression(points);
+
+    const lastDate = parseChartLabel(labels[labels.length - 1]);
+    let periodDays = 1;
+    if (labels.length >= 2) {
+        const prevDate = parseChartLabel(labels[labels.length - 2]);
+        const diffMs = lastDate - prevDate;
+        periodDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    const forecastValues = [];
+    const forecastLabels = [];
+
+    for (let i = 1; i <= forecastDays; i++) {
+        const futureIndex = absoluteData.length - 1 + i;
+        const predictedY = slope * futureIndex + intercept;
+        forecastValues.push(isNaN(predictedY) ? null : predictedY);
+
+        const futureDate = new Date(lastDate);
+        futureDate.setDate(futureDate.getDate() + periodDays * i);
+        forecastLabels.push(futureDate.toISOString().split('T')[0]);
+    }
+
+    return { values: forecastValues, labels: forecastLabels };
+}
+
 // Persist pct settings for a widget to the server
 async function persistPctSettings(widgetId, showPct, pctMode) {
     try {
@@ -87,7 +141,9 @@ function normalizeChartOptions(opts) {
         tension: opts.tension ?? 0.1,
         begin_at_zero: opts.begin_at_zero ?? false,
         show_pct: opts.show_pct ?? false,
-        pct_mode: opts.pct_mode || 'from_previous'
+        pct_mode: opts.pct_mode || 'from_previous',
+        enable_forecast: opts.enable_forecast ?? false,
+        forecast_days: opts.forecast_days ?? 30
     };
 }
 
@@ -248,6 +304,10 @@ async function updateWidgetDateRange(widgetId) {
     widget.chart_options.begin_at_zero = document.getElementById(`${widgetId}-begin-zero`).checked;
     widget.chart_options[PCT_ENABLED_KEY] = document.getElementById(`${widgetId}-show-pct`).checked;
     widget.chart_options[PCT_MODE_KEY] = document.getElementById(`${widgetId}-pct-mode`).value;
+    const enableForecastEl = document.getElementById(`${widgetId}-enable-forecast`);
+    const forecastDaysEl = document.getElementById(`${widgetId}-forecast-days`);
+    if (enableForecastEl) widget.chart_options.enable_forecast = enableForecastEl.checked;
+    if (forecastDaysEl) widget.chart_options.forecast_days = parseInt(forecastDaysEl.value, 10) || 30;
 
     try {
         const response = await fetch(`/api/widgets/${widgetId}`, {
@@ -483,7 +543,9 @@ function getChartOptions(widget) {
         tension: raw.tension,
         beginAtZero: raw.begin_at_zero,
         showPct: raw.show_pct,
-        pctMode: raw.pct_mode
+        pctMode: raw.pct_mode,
+        enableForecast: raw.enable_forecast,
+        forecastDays: raw.forecast_days
     };
 }
 
@@ -692,26 +754,57 @@ async function renderWidgetChart(widget, containerId, allAccounts, allGroups = [
             const chartTextColor = isDark ? '#eaeaea' : '#333';
             const chartGridColor = isDark ? '#444' : '#ddd';
             const chartColor = isDark ? '#5dade2' : '#3498db';
+            const forecastColor = isDark ? '#a0a0a0' : '#888';
+
+            // Forecast
+            let chartLabels = labels;
+            let chartData = absoluteData;
+            let forecastDataset = null;
+
+            if (opts.enableForecast) {
+                const result = computeForecast(absoluteData, labels, opts.forecastDays);
+                if (result) {
+                    chartData = [...absoluteData, ...result.values];
+                    chartLabels = [...labels, ...result.labels];
+                    forecastDataset = {
+                        label: 'Forecast',
+                        data: result.values,
+                        borderColor: forecastColor,
+                        backgroundColor: forecastColor + '10',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        tension: opts.tension,
+                        fill: false,
+                        pointRadius: 0,
+                        order: 1
+                    };
+                }
+            }
 
             if (widgetCharts[widget.id]) {
                 widgetCharts[widget.id].destroy();
             }
 
+            const combinedDatasets = [{
+                label: 'Total Balance',
+                data: chartData,
+                absoluteData: absoluteData,
+                borderColor: chartColor,
+                backgroundColor: chartColor + '20',
+                borderWidth: 2,
+                tension: opts.tension,
+                fill: opts.fillArea,
+                pointRadius: opts.showPoints ? 4 : 0
+            }];
+            if (forecastDataset) {
+                combinedDatasets.push(forecastDataset);
+            }
+
             widgetCharts[widget.id] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Total Balance',
-                        data: absoluteData,
-                        absoluteData: absoluteData,
-                        borderColor: chartColor,
-                        backgroundColor: chartColor + '20',
-                        borderWidth: 2,
-                        tension: opts.tension,
-                        fill: opts.fillArea,
-                        pointRadius: opts.showPoints ? 4 : 0
-                    }]
+                    labels: chartLabels,
+                    datasets: combinedDatasets
                 },
                 options: {
                     responsive: true,
@@ -902,11 +995,35 @@ async function renderWidgetChart(widget, containerId, allAccounts, allGroups = [
             const chartTextColor = isDark ? '#eaeaea' : '#333';
             const chartGridColor = isDark ? '#444' : '#ddd';
 
+            // Forecast for split mode
+            let splitLabels = labels;
+            let splitDatasets = datasets;
+
+            if (opts2.enableForecast) {
+                const firstVisible = datasets.find(d => d.data && d.data.length > 0 && d.data.some(v => v !== null));
+                if (firstVisible) {
+                    const result = computeForecast(firstVisible.absoluteData || firstVisible.data, labels, opts2.forecastDays);
+                    if (result) {
+                        splitLabels = [...labels, ...result.labels];
+                        splitDatasets = datasets.map(dataset => {
+                            if (!dataset.data || dataset.data.length === 0) return dataset;
+                            const forecastResult = computeForecast(dataset.absoluteData || dataset.data, labels, opts2.forecastDays);
+                            if (!forecastResult) return dataset;
+                            return {
+                                ...dataset,
+                                data: [...dataset.data, ...forecastResult.values],
+                                absoluteData: [...(dataset.absoluteData || dataset.data), ...forecastResult.values]
+                            };
+                        });
+                    }
+                }
+            }
+
             widgetCharts[widget.id] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: datasets
+                    labels: splitLabels,
+                    datasets: splitDatasets
                 },
                 options: {
                     responsive: true,
@@ -1082,6 +1199,10 @@ async function renderDashboard() {
                         <label>X-Axis Ticks: <input type="number" id="${widget.id}-x-limit" value="${chartOpts.xAxisLimit}" min="1" max="20" style="width: 60px;"></label>
                         <label>Y-Axis Ticks: <input type="number" id="${widget.id}-y-limit" value="${chartOpts.yAxisLimit}" min="1" max="10" style="width: 60px;"></label>
                         <label>Line Smoothness: <input type="range" id="${widget.id}-tension" value="${chartOpts.tension}" min="0" max="1" step="0.1" style="width: 100px;"></label>
+                        ${widgetType === 'balance' ? `
+                        <label class="checkbox-label"><input type="checkbox" id="${widget.id}-enable-forecast" ${chartOpts.enableForecast ? 'checked' : ''}> Forecast Trend</label>
+                        <label>Forecast Days: <input type="number" id="${widget.id}-forecast-days" value="${chartOpts.forecastDays}" min="1" max="365" style="width: 60px;"></label>
+                        ` : ''}
                     </div>
                         <div class="widget-settings-section" style="border-bottom: none; padding-bottom: 0;">
                             <strong>Width</strong>

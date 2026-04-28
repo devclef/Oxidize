@@ -47,6 +47,10 @@ pub struct ChartOptions {
     pub show_pct: bool,
     #[serde(default = "default_pct_mode")]
     pub pct_mode: String,
+    #[serde(default = "default_enable_forecast")]
+    pub enable_forecast: bool,
+    #[serde(default = "default_forecast_days")]
+    pub forecast_days: i32,
 }
 
 fn default_pct_mode() -> String {
@@ -85,6 +89,12 @@ fn default_begin_at_zero() -> bool {
 }
 fn default_show_pct() -> bool {
     false
+}
+fn default_enable_forecast() -> bool {
+    false
+}
+fn default_forecast_days() -> i32 {
+    30
 }
 
 /// Custom deserializer for Option<ChartOptions> that handles null values.

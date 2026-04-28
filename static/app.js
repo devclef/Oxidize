@@ -2083,6 +2083,19 @@ async function saveGraphAsWidget() {
     const groupIds = checkedGroups.map(g => g.id);
     const individualAccountIds = selectedIds.filter(id => !groupMemberIds.has(id));
 
+    // Get forecast settings
+    const enableForecastEl = document.getElementById('enable-forecast');
+    const forecastDaysEl = document.getElementById('forecast-days');
+    const showPctToggle = document.getElementById('show-pct-toggle');
+    const pctModeSelect = document.getElementById('pct-mode-select');
+
+    const chartOptions = {
+        enable_forecast: enableForecastEl ? enableForecastEl.checked : false,
+        forecast_days: forecastDaysEl ? (parseInt(forecastDaysEl.value, 10) || 30) : 30,
+        show_pct: showPctToggle ? showPctToggle.checked : false,
+        pct_mode: pctModeSelect ? pctModeSelect.value : 'from_previous'
+    };
+
     const widget = {
         id: generateUUID(),
         name: widgetName,
@@ -2092,7 +2105,8 @@ async function saveGraphAsWidget() {
         end_date: endDate || null,
         interval: interval || null,
         chart_mode: chartMode,
-        widget_type: widgetType
+        widget_type: widgetType,
+        chart_options: chartOptions
     };
 
     try {
