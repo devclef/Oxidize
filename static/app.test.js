@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { calculateRelativeDatesFromCustom, roundEndDate } from './date-utils.js';
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -1042,5 +1043,77 @@ describe('Account Groups', () => {
 
             expect(individualAccounts).toHaveLength(0);
         });
+    });
+});
+
+describe('Relative Time Range', () => {
+    it('should calculate dates from custom range (months)', () => {
+        const dates = calculateRelativeDatesFromCustom(3, 'months');
+        expect(dates).toBeDefined();
+        expect(dates).toHaveProperty('start');
+        expect(dates).toHaveProperty('end');
+        // End date should be today
+        const today = new Date().toISOString().split('T')[0];
+        expect(dates.end).toBe(today);
+        // Start should be ~3 months ago
+        const start = new Date(dates.start);
+        const end = new Date(dates.end);
+        const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        expect(diffMonths).toBe(3);
+    });
+
+    it('should calculate dates from custom range (days)', () => {
+        const dates = calculateRelativeDatesFromCustom(7, 'days');
+        expect(dates).toBeDefined();
+        const start = new Date(dates.start);
+        const end = new Date(dates.end);
+        const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+        expect(diffDays).toBe(7);
+    });
+
+    it('should calculate dates from custom range (weeks)', () => {
+        const dates = calculateRelativeDatesFromCustom(2, 'weeks');
+        expect(dates).toBeDefined();
+        const start = new Date(dates.start);
+        const end = new Date(dates.end);
+        const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+        expect(diffDays).toBe(14);
+    });
+
+    it('should calculate dates from custom range (years)', () => {
+        const dates = calculateRelativeDatesFromCustom(1, 'years');
+        expect(dates).toBeDefined();
+        const start = new Date(dates.start);
+        const end = new Date(dates.end);
+        const diffYears = end.getFullYear() - start.getFullYear();
+        expect(diffYears).toBe(1);
+    });
+
+    it('should return null for invalid unit', () => {
+        const dates = calculateRelativeDatesFromCustom(5, 'invalid');
+        expect(dates).toBeNull();
+    });
+});
+
+describe('Round End Date', () => {
+    it('should round to start of current month', () => {
+        const result = roundEndDate('2026-05-02', 'start_of_current_month');
+        expect(result).toBe('2026-05-01');
+    });
+
+    it('should round to end of current month', () => {
+        // May has 31 days
+        const result = roundEndDate('2026-05-02', 'end_of_current_month');
+        expect(result).toBe('2026-05-31');
+    });
+
+    it('should round to start of next month', () => {
+        const result = roundEndDate('2026-05-02', 'start_of_next_month');
+        expect(result).toBe('2026-06-01');
+    });
+
+    it('should return unchanged date for invalid mode', () => {
+        const result = roundEndDate('2026-05-02', 'invalid');
+        expect(result).toBe('2026-05-02');
     });
 });
