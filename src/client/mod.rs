@@ -214,47 +214,150 @@ impl FireflyClient {
             .fetch_all_transactions(&start, &end, account_ids.as_ref())
             .await?;
 
-        let spent_transactions: Vec<_> = all_transactions
-            .iter()
-            .filter(|tx| {
-                tx.get("attributes")
-                    .and_then(|a| a.get("transactions"))
-                    .and_then(|t| t.as_array())
-                    .map(|trans| {
-                        trans
-                            .iter()
-                            .any(|t| t.get("type").and_then(|ty| ty.as_str()) == Some("withdrawal"))
-                    })
-                    .unwrap_or(false)
-            })
-            .cloned()
-            .collect();
+        // Build a set of selected account IDs for transfer filtering
+        let selected_ids: std::collections::HashSet<String> = account_ids
+            .as_ref()
+            .map(|ids| ids.iter().cloned().collect())
+            .unwrap_or_default();
 
-        let earned_transactions: Vec<_> = all_transactions
-            .iter()
-            .filter(|tx| {
-                tx.get("attributes")
-                    .and_then(|a| a.get("transactions"))
-                    .and_then(|t| t.as_array())
-                    .map(|trans| {
-                        trans
-                            .iter()
-                            .any(|t| t.get("type").and_then(|ty| ty.as_str()) == Some("deposit"))
-                    })
-                    .unwrap_or(false)
-            })
-            .cloned()
-            .collect();
+        // Flatten all transactions into individual journal entries
+        let mut all_journals: Vec<serde_json::Value> = Vec::new();
+        for tx in &all_transactions {
+            if let Some(trans_arr) = tx
+                .get("attributes")
+                .and_then(|a| a.get("transactions"))
+                .and_then(|t| t.as_array())
+            {
+                for journal in trans_arr {
+                    all_journals.push(journal.clone());
+                }
+            }
+        }
 
-        let (earned_entries, spent_entries, currency_symbol, currency_code) = self
-            .aggregate_transactions_by_period(
-                &earned_transactions,
-                &spent_transactions,
-                &period_val,
-                &start,
-                &end,
-            )
-            .await;
+        // Classify each journal individually.
+        // A journal counts as earned if it's a deposit INTO a selected account
+        // from outside (source not selected). A journal counts as spent if it's
+        // a withdrawal FROM a selected account to outside (dest not selected).
+        // Transfers between selected accounts are excluded entirely.
+        let mut earned_entries: std::collections::HashMap<String, f64> =
+            std::collections::HashMap::new();
+        let mut spent_entries: std::collections::HashMap<String, f64> =
+            std::collections::HashMap::new();
+        let mut currency_symbol: Option<String> = None;
+        let mut currency_code: Option<String> = None;
+
+        // Seed all period keys with 0.0
+        if let Ok(period_keys) = Self::generate_period_keys(&start, &end, &period_val) {
+            for key in period_keys {
+                earned_entries.insert(key.clone(), 0.0);
+                spent_entries.insert(key, 0.0);
+            }
+        }
+
+        fn parse_tx_date(date_str: &str) -> Option<chrono::NaiveDateTime> {
+            chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
+                .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%SZ"))
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3f+00:00")
+                })
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3fZ")
+                })
+                .or_else(|_| {
+                    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
+                })
+                .ok()
+        }
+
+        let get_period_key = |date_str: &str, period: &str| -> String {
+            if let Some(date) = parse_tx_date(date_str) {
+                let key = match period {
+                    "1M" => date.format("%Y-%m-01T00:00:00+00:00").to_string(),
+                    "1Q" => {
+                        let quarter_month = match date.month() {
+                            1..=3 => 1,
+                            4..=6 => 4,
+                            7..=9 => 7,
+                            10..=12 => 10,
+                            _ => 1,
+                        };
+                        date.with_month(quarter_month)
+                            .unwrap()
+                            .format("%Y-%m-%dT00:00:00+00:00")
+                            .to_string()
+                    }
+                    "1W" => {
+                        let monday = date
+                            - chrono::Duration::days(date.weekday().num_days_from_monday() as i64);
+                        monday.format("%Y-%m-%dT00:00:00+00:00").to_string()
+                    }
+                    _ => date.format("%Y-%m-%dT00:00:00+00:00").to_string(),
+                };
+                return key;
+            } else if let Some(date_part) = date_str.split('T').next() {
+                if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
+                    return date.format("%Y-%m-%dT00:00:00+00:00").to_string();
+                }
+            }
+            date_str.to_string()
+        };
+
+        for journal in &all_journals {
+            let journal_type = journal
+                .get("type")
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+
+            let source_id = journal
+                .get("source_id")
+                .and_then(|s| s.as_str())
+                .unwrap_or("");
+            let dest_id = journal
+                .get("destination_id")
+                .and_then(|d| d.as_str())
+                .unwrap_or("");
+
+            // Skip internal transfers (both source and dest are selected)
+            if !selected_ids.is_empty()
+                && selected_ids.contains(source_id)
+                && selected_ids.contains(dest_id)
+            {
+                continue;
+            }
+
+            // Classify based on type and direction of flow
+            let is_earned = journal_type == "deposit"
+                && (!selected_ids.contains(source_id) || selected_ids.is_empty());
+            let is_spent = journal_type == "withdrawal"
+                && (!selected_ids.contains(dest_id) || selected_ids.is_empty());
+
+            if is_earned || is_spent {
+                if let Some(amount_str) = journal.get("amount").and_then(|a| a.as_str()) {
+                    if let Ok(amount) = amount_str.parse::<f64>() {
+                        if let Some(date) = journal.get("date").and_then(|d| d.as_str()) {
+                            let key = get_period_key(date, &period_val);
+                            if is_earned {
+                                *earned_entries.entry(key.clone()).or_insert(0.0) += amount;
+                            }
+                            if is_spent {
+                                *spent_entries.entry(key).or_insert(0.0) += amount;
+                            }
+                            if currency_symbol.is_none() {
+                                currency_symbol = journal
+                                    .get("currency_symbol")
+                                    .and_then(|s| s.as_str())
+                                    .map(String::from);
+                                currency_code = journal
+                                    .get("currency_code")
+                                    .and_then(|s| s.as_str())
+                                    .map(String::from);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(vec![
             ChartDataSet {
@@ -758,129 +861,7 @@ impl FireflyClient {
             .unwrap_or(false)
     }
 
-    async fn aggregate_transactions_by_period(
-        &self,
-        earned_transactions: &[serde_json::Value],
-        spent_transactions: &[serde_json::Value],
-        period: &str,
-        start_date: &str,
-        end_date: &str,
-    ) -> (
-        std::collections::HashMap<String, f64>,
-        std::collections::HashMap<String, f64>,
-        Option<String>,
-        Option<String>,
-    ) {
-        let mut earned_entries = std::collections::HashMap::new();
-        let mut spent_entries = std::collections::HashMap::new();
-        let mut currency_symbol = None;
-        let mut currency_code = None;
-
-        if let Ok(period_keys) = Self::generate_period_keys(start_date, end_date, period) {
-            for key in period_keys {
-                earned_entries.insert(key.clone(), 0.0);
-                spent_entries.insert(key, 0.0);
-            }
-        }
-
-        fn parse_transaction_date(date_str: &str) -> Option<chrono::NaiveDateTime> {
-            // Try multiple ISO 8601 formats that Firefly III might return
-            chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S+00:00")
-                .or_else(|_| chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%SZ"))
-                .or_else(|_| {
-                    chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3f+00:00")
-                })
-                .or_else(|_| {
-                    chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3fZ")
-                })
-                .or_else(|_| {
-                    // Try parsing just the date portion and default to midnight UTC
-                    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                        .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
-                })
-                .ok()
-        }
-
-        let get_period_key = |date_str: &str, period: &str| -> String {
-            if let Some(date) = parse_transaction_date(date_str) {
-                match period {
-                    "1M" => date.format("%Y-%m-01T00:00:00+00:00").to_string(),
-                    "1Q" => {
-                        let quarter_month = match date.month() {
-                            1..=3 => 1,
-                            4..=6 => 4,
-                            7..=9 => 7,
-                            10..=12 => 10,
-                            _ => 1,
-                        };
-                        date.with_month(quarter_month)
-                            .unwrap()
-                            .format("%Y-%m-%dT00:00:00+00:00")
-                            .to_string()
-                    }
-                    "1W" => {
-                        let monday = date
-                            - chrono::Duration::days(date.weekday().num_days_from_monday() as i64);
-                        monday.format("%Y-%m-%dT00:00:00+00:00").to_string()
-                    }
-                    _ => date.format("%Y-%m-%dT00:00:00+00:00").to_string(),
-                }
-            } else {
-                // If all parsing fails, try to extract just the date portion
-                if let Some(date_part) = date_str.split('T').next() {
-                    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y-%m-%d") {
-                        return date.format("%Y-%m-%dT00:00:00+00:00").to_string();
-                    }
-                }
-                date_str.to_string()
-            }
-        };
-
-        let mut process =
-            |transactions: &[serde_json::Value],
-             entries: &mut std::collections::HashMap<String, f64>| {
-                for tx in transactions {
-                    if let Some(transactions_arr) = tx
-                        .get("attributes")
-                        .and_then(|a| a.get("transactions"))
-                        .and_then(|t| t.as_array())
-                    {
-                        for t in transactions_arr {
-                            if let Some(amount_str) = t.get("amount").and_then(|a| a.as_str()) {
-                                if let Ok(amount) = amount_str.parse::<f64>() {
-                                    if let Some(date) = t.get("date").and_then(|d| d.as_str()) {
-                                        let key = get_period_key(date, period);
-                                        *entries.entry(key).or_insert(0.0) += amount;
-                                        if currency_symbol.is_none() {
-                                            currency_symbol = t
-                                                .get("currency_symbol")
-                                                .and_then(|s| s.as_str())
-                                                .map(String::from);
-                                            currency_code = t
-                                                .get("currency_code")
-                                                .and_then(|s| s.as_str())
-                                                .map(String::from);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
-        process(earned_transactions, &mut earned_entries);
-        process(spent_transactions, &mut spent_entries);
-
-        (
-            earned_entries,
-            spent_entries,
-            currency_symbol,
-            currency_code,
-        )
-    }
-
-    fn generate_period_keys(
+   fn generate_period_keys(
         start_date: &str,
         end_date: &str,
         period: &str,
