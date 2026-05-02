@@ -2299,6 +2299,150 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize theme
     initTheme();
 
+    // Time range setup
+    const timeRangeSelect = document.getElementById('time-range-select');
+    const applyTimeRangeBtn = document.getElementById('apply-time-range-btn');
+    const customRangeControls = document.getElementById('custom-range-controls');
+    const customRangeCount = document.getElementById('custom-range-count');
+    const customRangeUnit = document.getElementById('custom-range-unit');
+    const applyCustomRangeBtn = document.getElementById('apply-custom-range-btn');
+    const roundEndControls = document.getElementById('round-end-controls');
+    const roundEndCheckbox = document.getElementById('round-end-checkbox');
+    const roundEndMode = document.getElementById('round-end-mode');
+    const ROLL_END_MODE_KEY = 'oxidize_round_end_mode';
+
+    // Build time range dropdown from config
+    const timeRanges = CONFIG.timeRanges || ['7d', '30d', '3m', '6m', '1y', 'ytd'];
+    const defaultTimeRange = CONFIG.defaultTimeRange || '30d';
+
+    timeRanges.forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        // Convert key to readable label: '7d' -> '7 Days', '30d' -> '30 Days', 'ytd' -> 'YTD'
+        const match = key.match(/^(\d+)([dmwy])$/);
+        if (match) {
+            const num = match[1];
+            const unit = match[2];
+            const unitLabels = { d: 'Days', w: 'Weeks', m: 'Months', y: 'Years' };
+            option.textContent = `${num} ${unitLabels[unit]}`;
+        } else {
+            option.textContent = key.toUpperCase();
+        }
+        if (key === defaultTimeRange) option.selected = true;
+        timeRangeSelect.appendChild(option);
+    });
+
+    // Apply selected time range preset
+    function applyPresetTimeRange(key) {
+        const dates = calculateRelativeDates(key);
+        if (!dates) return;
+        document.getElementById('start-date').value = dates.start;
+        document.getElementById('end-date').value = dates.end;
+
+        // Update comparison dates if enabled
+        if (typeof enableComparison !== 'undefined' && enableComparison) {
+            const durationMs = new Date(dates.end) - new Date(dates.start);
+            const comparisonEndDate = new Date(new Date(dates.start).getTime() - durationMs);
+            const comparisonStart = new Date(comparisonEndDate.getTime() - durationMs);
+            document.getElementById('comparison-start-date').value = comparisonStart.toISOString().split('T')[0];
+            document.getElementById('comparison-end-date').value = comparisonEndDate.toISOString().split('T')[0];
+        }
+
+        // Apply round end date if enabled
+        if (roundEndCheckbox && roundEndCheckbox.checked) {
+            const roundedEnd = roundEndDate(dates.end, roundEndMode.value);
+            document.getElementById('end-date').value = roundedEnd;
+        }
+
+        fetchChartData();
+    }
+
+    // Apply custom relative range
+    function applyCustomRange() {
+        const count = parseInt(customRangeCount.value, 10) || 1;
+        const unit = customRangeUnit.value;
+        const dates = calculateRelativeDatesFromCustom(count, unit);
+        if (!dates) return;
+        document.getElementById('start-date').value = dates.start;
+        document.getElementById('end-date').value = dates.end;
+
+        // Apply round end date if enabled
+        if (roundEndCheckbox && roundEndCheckbox.checked) {
+            const roundedEnd = roundEndDate(dates.end, roundEndMode.value);
+            document.getElementById('end-date').value = roundedEnd;
+        }
+
+        fetchChartData();
+    }
+
+    // Time range select handler
+    timeRangeSelect.addEventListener('change', () => {
+        const value = timeRangeSelect.value;
+        if (value === '__none__') {
+            // Show custom range inputs
+            customRangeControls.style.display = 'inline-flex';
+            applyTimeRangeBtn.style.display = 'none';
+        } else {
+            // Hide custom range inputs
+            customRangeControls.style.display = 'none';
+            applyTimeRangeBtn.style.display = 'inline-block';
+            applyPresetTimeRange(value);
+        }
+    });
+
+    // Apply button for preset
+    if (applyTimeRangeBtn) {
+        applyTimeRangeBtn.addEventListener('click', () => {
+            applyPresetTimeRange(timeRangeSelect.value);
+        });
+    }
+
+    // Apply button for custom range
+    if (applyCustomRangeBtn) {
+        applyCustomRangeBtn.addEventListener('click', applyCustomRange);
+    }
+
+    // Round end date checkbox handler
+    if (roundEndCheckbox) {
+        const savedRoundMode = localStorage.getItem(ROLL_END_MODE_KEY) || 'end_of_current_month';
+        roundEndMode.value = savedRoundMode;
+
+        roundEndCheckbox.addEventListener('change', () => {
+            roundEndMode.style.display = roundEndCheckbox.checked ? 'inline-block' : 'none';
+            if (roundEndCheckbox.checked) {
+                // Re-apply current range with rounding
+                const currentValue = timeRangeSelect.value;
+                if (currentValue !== '__none__') {
+                    applyPresetTimeRange(currentValue);
+                } else {
+                    applyCustomRange();
+                }
+            } else {
+                // Re-apply without rounding
+                const currentValue = timeRangeSelect.value;
+                if (currentValue !== '__none__') {
+                    applyPresetTimeRange(currentValue);
+                } else {
+                    applyCustomRange();
+                }
+            }
+        });
+    }
+
+    // Round end mode change handler
+    if (roundEndMode) {
+        roundEndMode.addEventListener('change', () => {
+            localStorage.setItem(ROLL_END_MODE_KEY, roundEndMode.value);
+            // Re-apply current range with new rounding
+            const currentValue = timeRangeSelect.value;
+            if (currentValue !== '__none__') {
+                applyPresetTimeRange(currentValue);
+            } else {
+                applyCustomRange();
+            }
+        });
+    }
+
     // Theme toggle button
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
