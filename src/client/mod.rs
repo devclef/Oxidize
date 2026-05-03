@@ -781,6 +781,7 @@ impl FireflyClient {
                 let params = vec![
                     ("start".to_string(), chunk_start.clone()),
                     ("end".to_string(), chunk_end.clone()),
+                    ("limit".to_string(), "500".to_string()),
                     ("offset".to_string(), offset.to_string()),
                 ];
 
