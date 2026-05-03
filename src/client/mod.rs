@@ -304,10 +304,7 @@ impl FireflyClient {
         };
 
         for journal in &all_journals {
-            let journal_type = journal
-                .get("type")
-                .and_then(|t| t.as_str())
-                .unwrap_or("");
+            let journal_type = journal.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
             let source_id = journal
                 .get("source_id")
@@ -861,7 +858,7 @@ impl FireflyClient {
             .unwrap_or(false)
     }
 
-   fn generate_period_keys(
+    fn generate_period_keys(
         start_date: &str,
         end_date: &str,
         period: &str,

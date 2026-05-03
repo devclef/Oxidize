@@ -26,10 +26,7 @@ mod tests {
             let mut spent = 0.0;
 
             for journal in journals {
-                let journal_type = journal
-                    .get("type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
+                let journal_type = journal.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                 let source_id = journal
                     .get("source_id")
@@ -151,10 +148,7 @@ mod tests {
             let mut spent = 0.0;
 
             for journal in journals {
-                let journal_type = journal
-                    .get("type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
+                let journal_type = journal.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                 let source_id = journal
                     .get("source_id")
@@ -243,10 +237,7 @@ mod tests {
             let mut spent = 0.0;
 
             for journal in journals {
-                let journal_type = journal
-                    .get("type")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
+                let journal_type = journal.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                 let source_id = journal
                     .get("source_id")
