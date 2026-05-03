@@ -315,19 +315,28 @@ impl FireflyClient {
                 .and_then(|d| d.as_str())
                 .unwrap_or("");
 
-            // Skip internal transfers (both source and dest are selected)
-            if !selected_ids.is_empty()
-                && selected_ids.contains(source_id)
-                && selected_ids.contains(dest_id)
-            {
-                continue;
-            }
-
             // Classify based on type and direction of flow
-            let is_earned = journal_type == "deposit"
-                && (!selected_ids.contains(source_id) || selected_ids.is_empty());
-            let is_spent = journal_type == "withdrawal"
-                && (!selected_ids.contains(dest_id) || selected_ids.is_empty());
+            let is_earned = match journal_type {
+                "deposit" => !selected_ids.contains(source_id) || selected_ids.is_empty(),
+                "transfer" => {
+                    // Transfer into selected account from outside
+                    selected_ids.contains(dest_id)
+                        && (!selected_ids.contains(source_id) || selected_ids.is_empty())
+                }
+                _ => false,
+            };
+
+            let is_spent = match journal_type {
+                "withdrawal" => {
+                    !selected_ids.contains(dest_id) || selected_ids.is_empty()
+                }
+                "transfer" => {
+                    // Transfer out of selected account to outside
+                    selected_ids.contains(source_id)
+                        && (!selected_ids.contains(dest_id) || selected_ids.is_empty())
+                }
+                _ => false,
+            };
 
             if is_earned || is_spent {
                 if let Some(amount_str) = journal.get("amount").and_then(|a| a.as_str()) {
