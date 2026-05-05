@@ -273,7 +273,16 @@ impl FireflyClient {
         let get_period_key = |date_str: &str, period: &str| -> String {
             if let Some(date) = parse_tx_date(date_str) {
                 let key = match period {
-                    "1M" => date.format("%Y-%m-01T00:00:00+00:00").to_string(),
+                    "1M" => {
+                        let next_month = if date.month() == 12 {
+                            date.with_year(date.year() + 1).unwrap().with_month(1).unwrap()
+                        } else {
+                            date.with_month(date.month() + 1).unwrap()
+                        };
+                        (next_month - chrono::Duration::days(1))
+                            .format("%Y-%m-%dT00:00:00+00:00")
+                            .to_string()
+                    }
                     "1Q" => {
                         let quarter_month = match date.month() {
                             1..=3 => 1,
@@ -879,7 +888,16 @@ impl FireflyClient {
         let mut current = start;
         while current <= end {
             let key = match period {
-                "1M" => current.format("%Y-%m-01T00:00:00+00:00").to_string(),
+                "1M" => {
+                    let next_month = if current.month() == 12 {
+                        current.with_year(current.year() + 1).unwrap().with_month(1).unwrap()
+                    } else {
+                        current.with_month(current.month() + 1).unwrap()
+                    };
+                    (next_month - chrono::Duration::days(1))
+                        .format("%Y-%m-%dT00:00:00+00:00")
+                        .to_string()
+                }
                 "1Q" => {
                     let quarter_month = match current.month() {
                         1..=3 => 1,
