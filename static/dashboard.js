@@ -309,6 +309,9 @@ async function updateWidgetDateRange(widgetId) {
     if (enableForecastEl) widget.chart_options.enable_forecast = enableForecastEl.checked;
     if (forecastDaysEl) widget.chart_options.forecast_days = parseInt(forecastDaysEl.value, 10) || 30;
 
+    const earnedChartTypeEl = document.getElementById(`${widgetId}-earned-chart-type`);
+    if (earnedChartTypeEl) widget.earned_chart_type = earnedChartTypeEl.value;
+
     try {
         const response = await fetch(`/api/widgets/${widgetId}`, {
             method: 'PUT',
@@ -1389,6 +1392,15 @@ async function renderDashboard() {
                             <select id="${widget.id}-chart-mode">
                                 <option value="combined" ${widget.chart_mode === 'combined' || !widget.chart_mode ? 'selected' : ''}>Combined</option>
                                 <option value="split" ${widget.chart_mode === 'split' ? 'selected' : ''}>Split</option>
+                            </select>
+                        </label>
+                        ` : ''}
+                        ${widgetType === 'earned_spent' ? `
+                        <label>Earned Chart Type:
+                            <select id="${widget.id}-earned-chart-type">
+                                <option value="bars" ${widget.earned_chart_type === 'bars' || !widget.earned_chart_type ? 'selected' : ''}>Earned vs Spent</option>
+                                <option value="delta_line" ${widget.earned_chart_type === 'delta_line' ? 'selected' : ''}>Delta Line</option>
+                                <option value="delta_bar" ${widget.earned_chart_type === 'delta_bar' ? 'selected' : ''}>Delta Bar</option>
                             </select>
                         </label>
                         ` : ''}
