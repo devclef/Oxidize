@@ -274,15 +274,21 @@ impl FireflyClient {
             if let Some(date) = parse_tx_date(date_str) {
                 let key = match period {
                     "1M" => {
-                        let next_month = if date.month() == 12 {
-                            date.with_year(date.year() + 1)
-                                .unwrap()
-                                .with_month(1)
-                                .unwrap()
-                        } else {
-                            date.with_month(date.month() + 1).unwrap()
-                        };
-                        (next_month - chrono::Duration::days(1))
+                        let first_of_next = chrono::NaiveDate::from_ymd_opt(
+                            if date.month() == 12 {
+                                date.year() + 1
+                            } else {
+                                date.year()
+                            },
+                            if date.month() == 12 {
+                                1
+                            } else {
+                                date.month() + 1
+                            },
+                            1,
+                        )
+                        .unwrap();
+                        (first_of_next - chrono::Duration::days(1))
                             .format("%Y-%m-%dT00:00:00+00:00")
                             .to_string()
                     }
@@ -892,16 +898,21 @@ impl FireflyClient {
         while current <= end {
             let key = match period {
                 "1M" => {
-                    let next_month = if current.month() == 12 {
-                        current
-                            .with_year(current.year() + 1)
-                            .unwrap()
-                            .with_month(1)
-                            .unwrap()
-                    } else {
-                        current.with_month(current.month() + 1).unwrap()
-                    };
-                    (next_month - chrono::Duration::days(1))
+                    let first_of_next = chrono::NaiveDate::from_ymd_opt(
+                        if current.month() == 12 {
+                            current.year() + 1
+                        } else {
+                            current.year()
+                        },
+                        if current.month() == 12 {
+                            1
+                        } else {
+                            current.month() + 1
+                        },
+                        1,
+                    )
+                    .unwrap();
+                    (first_of_next - chrono::Duration::days(1))
                         .format("%Y-%m-%dT00:00:00+00:00")
                         .to_string()
                 }
