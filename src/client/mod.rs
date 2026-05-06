@@ -215,7 +215,7 @@ impl FireflyClient {
         use crate::models::chart::ChartDataSet;
 
         let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
-        let start = since.clone().or_else(|| start_date).unwrap_or_else(|| {
+        let start = since.clone().or(start_date).unwrap_or_else(|| {
             (Utc::now() - Duration::days(30))
                 .format("%Y-%m-%d")
                 .to_string()
