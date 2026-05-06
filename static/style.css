@@ -1097,15 +1097,15 @@ button:hover {
 .widget-settings button {
     padding: 2px var(--space-2);
     font-size: var(--text-sm);
-    background: var(--accent-color);
-    color: white;
-    border: none;
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     cursor: pointer;
 }
 
 .widget-settings button:hover {
-    background: var(--accent-hover);
+    background: var(--border-light);
 }
 
 .settings-toggle {
