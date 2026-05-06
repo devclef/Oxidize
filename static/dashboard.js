@@ -841,6 +841,99 @@ function extractChartData(entries, length) {
     }
 }
 
+async function refreshWidget(widgetId) {
+    const btn = document.querySelector(`[data-widget-id="${widgetId}"] .refresh-btn`);
+    if (btn) {
+        btn.textContent = '⟳ Refreshing...';
+        btn.disabled = true;
+    }
+
+    try {
+        const widgets = await getDashboardWidgets();
+        const widget = widgets.find(w => w.id === widgetId);
+        if (!widget) return;
+
+        const widgetType = widget.widget_type || 'balance';
+        const groupIds = widget.group_ids || [];
+        const allGroups = await fetchDashboardGroups();
+        const widgetGroups = groupIds.map(gid => allGroups.find(g => g.id === gid)).filter(Boolean);
+        const groupAccountIds = new Set();
+        widgetGroups.forEach(g => g.account_ids.forEach(id => groupAccountIds.add(id)));
+        const allWidgetAccountIds = [...new Set([...widget.accounts, ...groupAccountIds])];
+        const allAccounts = await fetchAccounts();
+
+        // Determine the since date from widget's updated_at
+        const sinceDate = widget.updated_at
+            ? widget.updated_at.split('T')[0]
+            : null;
+
+        if (widgetType === 'earned_spent' && sinceDate) {
+            // Incremental refresh: fetch partial chart from since date, merge into existing
+            const params = new URLSearchParams();
+            params.append('since', sinceDate);
+            if (widget.end_date) params.append('end', widget.end_date);
+            if (widget.interval && widget.interval !== 'auto') params.append('period', widget.interval);
+            allWidgetAccountIds.forEach(id => params.append('accounts[]', id));
+
+            const response = await fetch(`/api/earned-spent/since?${params.toString()}`);
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status} ${response.statusText}`);
+            }
+
+            const partialChart = await response.json();
+
+            // Merge partial chart entries into existing chart data
+            let history;
+            const chartInstance = Chart.getChart(widgetId);
+            if (chartInstance) {
+                // Use existing chart data as base, overlay partial chart entries
+                history = mergePartialChartIntoExisting(chartInstance, partialChart);
+            } else {
+                // No existing chart, use partial data directly
+                history = partialChart;
+            }
+
+            // Re-render with merged data
+            const ctx = document.getElementById(widgetId).getContext('2d');
+            const labels = extractChartLabels(history);
+            const earnedChartType = widget.earned_chart_type || 'bars';
+            await renderEarnedSpentChart(ctx, widget, labels, history, widgetId, earnedChartType);
+        } else {
+            // Balance widgets or no since date: full re-fetch
+            await renderWidgetChart(widget, widgetId, allAccounts, allGroups);
+        }
+    } catch (e) {
+        console.error('Failed to refresh widget:', e);
+        alert(`Failed to refresh widget: ${e.message}`);
+    } finally {
+        if (btn) {
+            btn.textContent = '⟳ Refresh';
+            btn.disabled = false;
+        }
+    }
+}
+
+// Merge partial chart data (from since-date fetch) into existing chart data
+function mergePartialChartIntoExisting(chartInstance, partialChart) {
+    const existingDatasets = chartInstance.config.data.datasets;
+    const partialDatasets = partialChart || [];
+
+    // Build a map of partial entries by dataset label
+    const partialEntriesMap = {};
+    for (const dataset of partialDatasets) {
+        partialEntriesMap[dataset.label] = dataset.entries || {};
+    }
+
+    // Merge: update entries that exist in partial chart, keep existing entries for others
+    const merged = existingDatasets.map(dataset => {
+        const partialEntries = partialEntriesMap[dataset.label] || {};
+        const mergedEntries = { ...dataset.entries, ...partialEntries };
+        return { ...dataset, entries: mergedEntries };
+    });
+
+    return merged;
+}
+
 async function renderWidgetChart(widget, containerId, allAccounts, allGroups = []) {
     const ctx = document.getElementById(containerId).getContext('2d');
 
@@ -1349,6 +1442,7 @@ async function renderDashboard() {
                 <div class="widget-header">
                     <span class="widget-title">${widget.name}</span>
                     <div class="widget-actions">
+                        <button class="refresh-btn" onclick="refreshWidget('${widget.id}')">⟳ Refresh</button>
                         <button class="settings-toggle" onclick="toggleWidgetSettings('${widget.id}')">▼ Settings</button>
                         <button onclick="deleteWidget('${widget.id}')">Delete</button>
                     </div>

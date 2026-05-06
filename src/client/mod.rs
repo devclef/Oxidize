@@ -200,10 +200,22 @@ impl FireflyClient {
         period: Option<String>,
         account_ids: Option<Vec<String>>,
     ) -> Result<ChartLine, String> {
+        self.get_earned_spent_with_since(start_date, end_date, period, account_ids, None)
+            .await
+    }
+
+    pub async fn get_earned_spent_with_since(
+        &self,
+        start_date: Option<String>,
+        end_date: Option<String>,
+        period: Option<String>,
+        account_ids: Option<Vec<String>>,
+        since: Option<String>,
+    ) -> Result<ChartLine, String> {
         use crate::models::chart::ChartDataSet;
 
         let end = end_date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
-        let start = start_date.unwrap_or_else(|| {
+        let start = since.clone().or_else(|| start_date).unwrap_or_else(|| {
             (Utc::now() - Duration::days(30))
                 .format("%Y-%m-%d")
                 .to_string()

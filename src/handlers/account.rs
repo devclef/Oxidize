@@ -135,6 +135,54 @@ pub async fn get_earned_spent(
     }
 }
 
+/// GET endpoint for earned vs spent with a start date filter
+/// Used for incremental refresh - only returns chart data for transactions since the given date
+#[get("/api/earned-spent/since")]
+pub async fn get_earned_spent_since(
+    client: web::Data<FireflyClient>,
+    req: HttpRequest,
+) -> impl Responder {
+    let query_string = req.query_string();
+    let params: Vec<(String, String)> =
+        serde_urlencoded::from_str(query_string).unwrap_or_default();
+
+    let mut since: Option<String> = None;
+    let mut end: Option<String> = None;
+    let mut period: Option<String> = None;
+    let mut account_ids: Vec<String> = Vec::new();
+
+    for (k, v) in params {
+        match k.as_str() {
+            "since" => since = Some(v),
+            "end" => end = Some(v),
+            "period" => period = Some(v),
+            "accounts[]" | "accounts" => {
+                account_ids.push(v);
+            }
+            _ => {
+                if k == "accounts%5B%5D" {
+                    account_ids.push(v);
+                }
+            }
+        }
+    }
+
+    let since = match since {
+        Some(s) => s,
+        None => {
+            return HttpResponse::BadRequest().body("missing 'since' parameter");
+        }
+    };
+
+    match client
+        .get_earned_spent(Some(since), end, period, Some(account_ids))
+        .await
+    {
+        Ok(history) => HttpResponse::Ok().json(history),
+        Err(e) => HttpResponse::InternalServerError().body(e),
+    }
+}
+
 /// GET endpoint for expense by category chart data
 #[get("/api/expenses-by-category")]
 pub async fn get_expenses_by_category(

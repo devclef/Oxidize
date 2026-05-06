@@ -901,6 +901,15 @@ button:hover {
     font-size: 12px;
 }
 
+.widget-actions .refresh-btn {
+    color: var(--text-muted);
+}
+
+.widget-actions .refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .widget-body {
     padding: var(--space-3);
     flex: 1;
